@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+*.log
+.wp-env.json.default
+.env
+.DS_Store
+*.swp
+*.swo
+QUICKSTART.md
+README.md
