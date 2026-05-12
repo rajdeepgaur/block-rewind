@@ -1,49 +1,37 @@
 <?php
 /**
  * Plugin Name: Live Editing History for Gutenberg
- * Description: Session-based block history with time travel for Gutenberg
- * Version: 1.0.0
- * Author: Rajdeep Singh Gaur
+ * Description: Session-based block history tracking for Gutenberg using IndexedDB.
+ * Version: 0.1.0
+ * Author: Rajdeep
  * License: GPL-2.0-or-later
- * Text Domain: live-editing-history-for-gutenberg
- * Domain Path: /languages
  *
- * @package LiveEditingHistoryForGutenberg
+ * @package LEHFG
  */
 
-namespace LiveEditingHistoryForGutenberg;
-
-// Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Define plugin constants
-define( 'LEHFG_VERSION', '1.0.0' );
-define( 'LEHFG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'LEHFG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-
 /**
- * Initialize plugin
+ * Enqueue editor assets for Gutenberg.
  */
-function init() {
-	// Enqueue scripts for editor
-	add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_editor_assets' );
-}
+function lehfg_enqueue_block_editor_assets() {
+	$asset_path = plugin_dir_path( __FILE__ ) . 'build/index.asset.php';
 
-/**
- * Enqueue editor scripts and styles
- */
-function enqueue_editor_assets() {
-	// Enqueue the main script built from src/main.js
+	if ( ! file_exists( $asset_path ) ) {
+		return;
+	}
+
+	$asset = include $asset_path;
+
 	wp_enqueue_script(
-		'lehfg-editor',
-		LEHFG_PLUGIN_URL . 'build/index.js',
-		array( 'wp-blocks', 'wp-element', 'wp-editor', 'wp-data', 'wp-plugins' ),
-		LEHFG_VERSION,
-		false
+		'lehfg-editor-runtime',
+		plugin_dir_url( __FILE__ ) . 'build/index.js',
+		$asset['dependencies'],
+		$asset['version'],
+		true
 	);
 }
 
-// Initialize plugin
-add_action( 'plugins_loaded', __NAMESPACE__ . '\\init' );
+add_action( 'enqueue_block_editor_assets', 'lehfg_enqueue_block_editor_assets' );
