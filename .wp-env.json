@@ -5,5 +5,6 @@
   "config": {
     "WP_DEBUG": true,
     "SCRIPT_DEBUG": true
-  }
+  },
+    "phpmyadmin": true
 }

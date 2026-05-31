@@ -1,5 +1,6 @@
 import domReady from '@wordpress/dom-ready';
 
+import './identity/register-block-attributes';
 import { initializeHistoryRuntime } from './runtime/initialize';
 
 // Boot the plugin runtime once the editor DOM is ready.
