@@ -16,6 +16,7 @@ const registerLehfgBlockAttribute = ( settings = {} ) => {
 			...attributes,
 			[ LEHFG_BLOCK_ID_ATTRIBUTE ]: {
 				type: 'string',
+				default: '',
 			},
 		},
 	};
