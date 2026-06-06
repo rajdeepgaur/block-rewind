@@ -1,12 +1,15 @@
 import { Button, PanelBody, Spinner } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
+import { dispatch, useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { __ } from '@wordpress/i18n';
+import { useState } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
 
 import { getLehfgBlockId } from '../../identity/block-identity';
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
+import { computeSerializedHash, serializeBlockState } from '../../serialization/serialize-block';
 import { useSelectedBlockHistory } from './use-selected-block-history';
+import { SnapshotPreviewModal } from '../preview/snapshot-preview-modal';
 
 // Formats a snapshot timestamp for the history list.
 const formatSnapshotTime = ( timestamp ) => new Date( timestamp ).toLocaleString();
@@ -17,6 +20,30 @@ const SidebarContent = () => {
 	const postId = useSelect( ( select ) => select( 'core/editor' ).getCurrentPostId(), [] );
 	const { snapshots, isLoading, error } = useSelectedBlockHistory( selectedBlock, postId );
 	const blockId = getLehfgBlockId( selectedBlock );
+	const [ activePreviewSnapshot, setActivePreviewSnapshot ] = useState( null );
+
+	const handlePreviewSnapshot = ( snapshot ) => {
+		if ( ! selectedBlock ) {
+			return;
+		}
+
+		const currentHash = computeSerializedHash( serializeBlockState( selectedBlock ) );
+
+		if ( currentHash === snapshot.hash ) {
+			dispatch( 'core/notices' ).createNotice(
+				'info',
+				'This snapshot already matches the current block.',
+				{
+					dismissible: true,
+				}
+			);
+			return;
+		}
+
+		setActivePreviewSnapshot( snapshot );
+	};
+
+	const closePreviewModal = () => setActivePreviewSnapshot( null );
 
 	if ( ! selectedBlock ) {
 		return <div className="lehfg-sidebar__empty">{ __( 'No block selected', 'lehfg' ) }</div>;
@@ -39,23 +66,39 @@ const SidebarContent = () => {
 	}
 
 	return (
-		<div className="lehfg-sidebar__history">
-			{ snapshots.map( ( snapshot ) => (
-				<PanelBody
-					key={ snapshot.snapshotId }
-					title={ formatSnapshotTime( snapshot.timestamp ) }
-					initialOpen={ false }
-				>
-					<p>{ snapshot.blockName }</p>
-					<Button
-						variant="secondary"
-						onClick={ () => restoreSnapshotToEditor( snapshot ) }
+		<>
+			<div className="lehfg-sidebar__history">
+				{ snapshots.map( ( snapshot ) => (
+					<PanelBody
+						key={ snapshot.snapshotId }
+						title={ formatSnapshotTime( snapshot.timestamp ) }
+						initialOpen={ false }
 					>
-						{ __( 'Restore', 'lehfg' ) }
-					</Button>
-				</PanelBody>
-			) ) }
-		</div>
+						<p>{ snapshot.blockName }</p>
+						<div>
+							<Button
+								variant="secondary"
+								onClick={ () => handlePreviewSnapshot( snapshot ) }
+							>
+								{ __( 'Preview', 'lehfg' ) }
+							</Button>
+							<Button
+								variant="secondary"
+								onClick={ () => restoreSnapshotToEditor( snapshot ) }
+							>
+								{ __( 'Restore', 'lehfg' ) }
+							</Button>
+						</div>
+					</PanelBody>
+				) ) }
+			</div>
+			<SnapshotPreviewModal
+				isOpen={ Boolean( activePreviewSnapshot ) }
+				onRequestClose={ closePreviewModal }
+				currentBlock={ selectedBlock }
+				snapshot={ activePreviewSnapshot }
+			/>
+		</>
 	);
 };
 

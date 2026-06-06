@@ -1,0 +1,25 @@
+.lehfg-preview-modal {
+	max-height: 70vh;
+	overflow: auto;
+}
+
+.lehfg-preview-modal__grid {
+	display: flex;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.lehfg-preview-modal__panel {
+	flex: 1 1 320px;
+	min-width: 280px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 12px;
+	background: #fff;
+}
+
+.lehfg-preview-modal__viewport {
+	pointer-events: none;
+	user-select: none;
+	min-height: 160px;
+}
