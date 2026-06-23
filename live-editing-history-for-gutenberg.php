@@ -3,7 +3,7 @@
  * Plugin Name: Live Editing History for Gutenberg
  * Description: Session-based block history tracking for Gutenberg using IndexedDB.
  * Version: 0.1.0
- * Author: Rajdeep
+ * Author: Rajdeep Singh Gaur
  * License: GPL-2.0-or-later
  *
  * @package LEHFG
@@ -31,6 +31,13 @@ function lehfg_enqueue_block_editor_assets() {
 		$asset['dependencies'],
 		$asset['version'],
 		true
+	);
+
+	wp_enqueue_style(
+		'lehfg-editor-runtime',
+		plugin_dir_url( __FILE__ ) . 'build/index.css',
+		array(),
+		$asset['version']
 	);
 }
 
