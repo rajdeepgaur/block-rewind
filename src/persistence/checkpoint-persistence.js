@@ -5,8 +5,8 @@ import {
 	clearDirtyBlock,
 	getDirtyBlockIds,
 } from '../change-detection/dirty-registry';
-import { findBlockByLehfgBlockId } from '../selectors/block-tree';
-import { persistSnapshotForBlockIfChanged } from '../snapshots/snapshot-service';
+import { scanEditorBlocks } from '../change-detection/subscribe-store';
+import { persistSnapshotIfChanged } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 
 // Persists snapshots for all dirty blocks and clears their dirty flags.
@@ -26,14 +26,17 @@ const runCheckpoint = async () => {
 			return;
 		}
 
-		const dirtyBlockIds = getDirtyBlockIds();
-		for ( const blockId of dirtyBlockIds ) {
-			const block = findBlockByLehfgBlockId( blockId );
-			if ( block ) {
-				await persistSnapshotForBlockIfChanged( block, postId );
-			}
+		scanEditorBlocks();
 
+		for ( const blockId of getDirtyBlockIds() ) {
+			const block = runtimeState.blockByBlockId.get( blockId );
+
+			// Clear first so edits made while this write is pending mark the block again.
 			clearDirtyBlock( blockId );
+
+			if ( block ) {
+				await persistSnapshotIfChanged( blockId, block, postId );
+			}
 		}
 	} finally {
 		runtimeState.checkpointInProgress = false;

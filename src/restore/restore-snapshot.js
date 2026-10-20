@@ -1,18 +1,15 @@
 import { createBlock } from '@wordpress/blocks';
-import { dispatch } from '@wordpress/data';
-import { select } from '@wordpress/data';
+import { dispatch, select } from '@wordpress/data';
 
 import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
-import { findBlockByLehfgBlockId } from '../selectors/block-tree';
-import { runtimeState } from '../state/runtime-state';
+import { getTrackedBlock } from '../change-detection/subscribe-store';
+import { claimBlockId } from '../identity/resolve-block-identities';
+import { computeBlockHash } from '../serialization/serialize-block';
 import {
-	getSnapshotByHashForBlock,
-	persistRecoverySnapshotForBlockIfChanged,
+	findSnapshotByHash,
+	persistSnapshotIfChanged,
 } from '../snapshots/snapshot-service';
-import {
-	computeSerializedHash,
-	serializeBlockState,
-} from '../serialization/serialize-block';
+import { runtimeState } from '../state/runtime-state';
 
 // Rebuilds nested block instances from serialized snapshot inner blocks.
 const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
@@ -26,17 +23,17 @@ const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
 
 // Replaces the current editor block content with a stored snapshot.
 export const restoreSnapshotToEditor = async ( snapshot ) => {
-	if ( ! snapshot?.blockId ) {
+	const blockId = snapshot?.blockId;
+	if ( ! blockId ) {
 		return false;
 	}
 
-	const targetBlock = findBlockByLehfgBlockId( snapshot.blockId );
+	const targetBlock = getTrackedBlock( blockId );
 	if ( ! targetBlock ) {
 		return false;
 	}
 
-	const currentSerializedState = serializeBlockState( targetBlock );
-	const currentHash = computeSerializedHash( currentSerializedState );
+	const currentHash = computeBlockHash( targetBlock );
 
 	if ( snapshot.hash && currentHash === snapshot.hash ) {
 		dispatch( 'core/notices' ).createNotice(
@@ -53,44 +50,42 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 
 	try {
 		const postId = select( 'core/editor' ).getCurrentPostId();
-		if ( postId ) {
-			if (
-				! ( await getSnapshotByHashForBlock(
-					postId,
-					snapshot.blockId,
-					currentHash
-				) )
-			) {
-				await persistRecoverySnapshotForBlockIfChanged(
-					targetBlock,
-					postId
-				);
-			}
+
+		// Save the current state first so the restore can itself be reverted from history.
+		if (
+			postId &&
+			! ( await findSnapshotByHash( postId, blockId, currentHash ) )
+		) {
+			await persistSnapshotIfChanged( blockId, targetBlock, postId );
+		}
+
+		const latestTargetBlock = getTrackedBlock( blockId );
+		if ( ! latestTargetBlock ) {
+			return false;
 		}
 
 		const replacementBlock = createBlock(
 			snapshot.blockName,
 			{
 				...( snapshot.attributes || {} ),
-				[ LEHFG_BLOCK_ID_ATTRIBUTE ]: snapshot.blockId,
+				[ LEHFG_BLOCK_ID_ATTRIBUTE ]: blockId,
 			},
 			rehydrateInnerBlocks( snapshot.innerBlocks || [] )
 		);
 
 		dispatch( 'core/block-editor' ).replaceBlock(
-			targetBlock.clientId,
+			latestTargetBlock.clientId,
 			replacementBlock
 		);
-		runtimeState.lastObservedHashes.set(
-			snapshot.blockId,
-			computeSerializedHash( {
-				attributes: {
-					...( snapshot.attributes || {} ),
-					[ LEHFG_BLOCK_ID_ATTRIBUTE ]: snapshot.blockId,
-				},
-				innerBlocks: snapshot.innerBlocks || [],
-			} )
+
+		// The restored block takes over the ID; its content is already in history.
+		claimBlockId(
+			runtimeState.identity,
+			replacementBlock.clientId,
+			blockId
 		);
+		runtimeState.observedByBlockId.set( blockId, replacementBlock );
+
 		dispatch( 'core/notices' ).createNotice(
 			'info',
 			'Target snapshot restored successfully',

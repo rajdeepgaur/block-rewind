@@ -1,13 +1,17 @@
 import { select } from '@wordpress/data';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+// Inner blocks of synced patterns belong to the pattern, not to the current post.
+const SKIP_INNER_BLOCKS_OF = new Set( [ 'core/block' ] );
 
 // Flattens a nested block tree into a single list.
 const flattenBlocks = ( blocks, collector = [] ) => {
 	for ( const block of blocks ) {
 		collector.push( block );
 
-		if ( block.innerBlocks?.length ) {
+		if (
+			block.innerBlocks?.length &&
+			! SKIP_INNER_BLOCKS_OF.has( block.name )
+		) {
 			flattenBlocks( block.innerBlocks, collector );
 		}
 	}
@@ -21,19 +25,4 @@ export const getAllEditorBlocks = () => {
 	const topLevelBlocks = blockEditorSelect.getBlocks() || [];
 
 	return flattenBlocks( topLevelBlocks );
-};
-
-// Finds a block in the editor by its persistent plugin ID.
-export const findBlockByLehfgBlockId = ( blockId ) => {
-	if ( ! blockId ) {
-		return null;
-	}
-
-	const allBlocks = getAllEditorBlocks();
-	return (
-		allBlocks.find(
-			( block ) =>
-				block.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] === blockId
-		) || null
-	);
 };

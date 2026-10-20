@@ -5,19 +5,41 @@ import {
 	getSnapshotsByPostAndBlock,
 	putSnapshot,
 } from '../db/indexeddb';
-import { getLehfgBlockId } from '../identity/block-identity';
 import {
-	computeSerializedHash,
+	computeBlockHash,
 	serializeBlockState,
 } from '../serialization/serialize-block';
 import { generateSnapshotId } from '../utils/generate-id';
+
+const changeListeners = new Set();
+
+// Snapshot writes run one at a time so "compare with latest, then write" never races.
+let writeQueue = Promise.resolve();
+
+const enqueueWrite = ( task ) => {
+	const result = writeQueue.then( task );
+	writeQueue = result.catch( () => {} );
+	return result;
+};
+
+const notifySnapshotChange = ( snapshot ) => {
+	for ( const listener of changeListeners ) {
+		listener( snapshot );
+	}
+};
+
+// Registers a listener called after a snapshot is written. Returns an unsubscribe function.
+export const subscribeToSnapshotChanges = ( listener ) => {
+	changeListeners.add( listener );
+	return () => changeListeners.delete( listener );
+};
 
 // Fetches all snapshots for a specific block in the current post.
 export const listSnapshotsForBlock = ( postId, blockId ) =>
 	getSnapshotsByPostAndBlock( postId, blockId );
 
-// Fetches a persisted snapshot for a block by its stored hash.
-export const getSnapshotByHashForBlock = async ( postId, blockId, hash ) => {
+// Fetches a persisted snapshot for a block by its content hash.
+export const findSnapshotByHash = async ( postId, blockId, hash ) => {
 	if ( ! postId || ! blockId || ! hash ) {
 		return null;
 	}
@@ -26,69 +48,38 @@ export const getSnapshotByHashForBlock = async ( postId, blockId, hash ) => {
 	return snapshots.find( ( snapshot ) => snapshot.hash === hash ) || null;
 };
 
-// Fetches the latest persisted snapshot for a block in the current post.
-export const getLatestSnapshotForBlock = ( postId, blockId ) =>
-	getLatestSnapshotByPostAndBlock( postId, blockId );
+// Persists a block's state under a history ID unless it matches the latest snapshot.
+export const persistSnapshotIfChanged = ( blockId, block, postId ) =>
+	enqueueWrite( async () => {
+		if ( ! postId || ! blockId || ! block ) {
+			return false;
+		}
 
-// Persists a snapshot only when serialized block state changed.
-export const persistSnapshotForBlockIfChanged = async ( block, postId ) => {
-	const blockId = getLehfgBlockId( block );
+		const hash = computeBlockHash( block );
+		const latestSnapshot = await getLatestSnapshotByPostAndBlock(
+			postId,
+			blockId
+		);
 
-	if ( ! postId || ! blockId ) {
-		return false;
-	}
+		if ( latestSnapshot?.hash === hash ) {
+			return false;
+		}
 
-	const serializedState = serializeBlockState( block );
-	const hash = computeSerializedHash( serializedState );
-	const latestSnapshot = await getLatestSnapshotByPostAndBlock(
-		postId,
-		blockId
-	);
+		const now = Date.now();
+		const snapshot = {
+			snapshotId: generateSnapshotId(),
+			blockId,
+			postId,
+			...serializeBlockState( block ),
+			timestamp: now,
+			expiresAt: now + SNAPSHOT_TTL_MS,
+			hash,
+		};
 
-	if ( latestSnapshot?.hash === hash ) {
-		return false;
-	}
-
-	const now = Date.now();
-	const snapshot = {
-		snapshotId: generateSnapshotId(),
-		blockId,
-		postId,
-		blockName: block.name,
-		attributes: serializedState.attributes,
-		innerBlocks: serializedState.innerBlocks,
-		timestamp: now,
-		expiresAt: now + SNAPSHOT_TTL_MS,
-		hash,
-	};
-
-	await putSnapshot( snapshot );
-	return true;
-};
-
-// Persists the current live block state as a recovery snapshot when it differs from the latest saved state.
-export const persistRecoverySnapshotForBlockIfChanged = async (
-	block,
-	postId
-) => persistSnapshotForBlockIfChanged( block, postId );
-
-// Creates the first snapshot for a block if history is empty.
-export const ensureInitialSnapshotForBlock = async ( block, postId ) => {
-	const blockId = getLehfgBlockId( block );
-
-	if ( ! postId || ! blockId ) {
-		return false;
-	}
-
-	const existingSnapshots = await listSnapshotsForBlock( postId, blockId );
-
-	if ( existingSnapshots.length ) {
-		return false;
-	}
-
-	await persistSnapshotForBlockIfChanged( block, postId );
-	return true;
-};
+		await putSnapshot( snapshot );
+		notifySnapshotChange( snapshot );
+		return true;
+	} );
 
 // Removes expired snapshots using the current timestamp.
 export const runSnapshotExpiryCleanup = async () => {

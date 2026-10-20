@@ -5,19 +5,12 @@ import { __ } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
 
-import { getLehfgBlockId } from '../../identity/block-identity';
+import { getTrackedBlockId } from '../../identity/block-identity';
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
-import {
-	computeSerializedHash,
-	serializeBlockState,
-} from '../../serialization/serialize-block';
+import { computeBlockHash } from '../../serialization/serialize-block';
 import { useSelectedBlockHistory } from './use-selected-block-history';
 import { SnapshotPreviewModal } from '../preview/snapshot-preview-modal';
 import { formatSnapshotTimestamp } from '../../utils/format-snapshot-timestamp';
-
-// Formats a snapshot timestamp for the history list.
-const formatSnapshotTime = ( timestamp ) =>
-	new Date( timestamp ).toLocaleString();
 
 // Renders the sidebar contents for the selected block history.
 const SidebarContent = () => {
@@ -33,7 +26,7 @@ const SidebarContent = () => {
 		selectedBlock,
 		postId
 	);
-	const blockId = getLehfgBlockId( selectedBlock );
+	const blockId = getTrackedBlockId( selectedBlock );
 	const [ activePreviewSnapshot, setActivePreviewSnapshot ] =
 		useState( null );
 
@@ -42,11 +35,7 @@ const SidebarContent = () => {
 			return;
 		}
 
-		const currentHash = computeSerializedHash(
-			serializeBlockState( selectedBlock )
-		);
-
-		if ( currentHash === snapshot.hash ) {
+		if ( computeBlockHash( selectedBlock ) === snapshot.hash ) {
 			dispatch( 'core/notices' ).createNotice(
 				'info',
 				'This snapshot already matches the current block.',
@@ -80,7 +69,10 @@ const SidebarContent = () => {
 	if ( ! blockId ) {
 		return (
 			<div className="lehfg-sidebar__empty">
-				{ __( 'No history available for this block', 'lehfg' ) }
+				{ __(
+					'No history yet. Edit this block to start recording its history.',
+					'lehfg'
+				) }
 			</div>
 		);
 	}
