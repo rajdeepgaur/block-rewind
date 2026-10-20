@@ -1,17 +1,17 @@
 import { select } from '@wordpress/data';
 
-// Inner blocks of synced patterns belong to the pattern, not to the current post.
-const SKIP_INNER_BLOCKS_OF = new Set( [ 'core/block' ] );
+import { hasExternalInnerBlocks } from '../utils/external-content';
 
-// Flattens a nested block tree into a single list.
+// Flattens a nested block tree into a single list of trackable blocks.
 const flattenBlocks = ( blocks, collector = [] ) => {
 	for ( const block of blocks ) {
+		if ( hasExternalInnerBlocks( block ) ) {
+			continue;
+		}
+
 		collector.push( block );
 
-		if (
-			block.innerBlocks?.length &&
-			! SKIP_INNER_BLOCKS_OF.has( block.name )
-		) {
+		if ( block.innerBlocks?.length ) {
 			flattenBlocks( block.innerBlocks, collector );
 		}
 	}

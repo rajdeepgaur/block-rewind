@@ -2,7 +2,10 @@ import { select, subscribe } from '@wordpress/data';
 
 import { SCAN_THROTTLE_MS } from '../constants';
 import { markBlockDirty, pruneDirtyBlocks } from './dirty-registry';
-import { writeBlockIdAttributes } from '../identity/block-identity';
+import {
+	notifyTrackedIdsChanged,
+	writeBlockIdAttributes,
+} from '../identity/block-identity';
 import {
 	claimBlockId,
 	resolveBlockIdentities,
@@ -12,6 +15,12 @@ import { getAllEditorBlocks } from '../selectors/block-tree';
 import { persistSnapshotIfChanged } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 import { generateBlockId } from '../utils/generate-id';
+
+const areMapsEqual = ( left, right ) =>
+	left.size === right.size &&
+	Array.from( left ).every(
+		( [ key, value ] ) => right.get( key ) === value
+	);
 
 const logError = ( error ) => {
 	// eslint-disable-next-line no-console
@@ -133,10 +142,18 @@ export const scanEditorBlocks = () => {
 	}
 
 	pruneDirtyBlocks( new Set( blockByBlockId.keys() ) );
+	const trackedIdsChanged = ! areMapsEqual(
+		runtimeState.idByClientId,
+		idByClientId
+	);
 	runtimeState.idByClientId = idByClientId;
 	runtimeState.blockByBlockId = blockByBlockId;
 
 	writeBlockIdAttributes( writes );
+
+	if ( trackedIdsChanged ) {
+		notifyTrackedIdsChanged();
+	}
 
 	const postId = select( 'core/editor' ).getCurrentPostId();
 	for ( const { blockId, block } of baselines ) {

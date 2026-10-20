@@ -6,11 +6,19 @@ import {
 	getDirtyBlockIds,
 } from '../change-detection/dirty-registry';
 import { scanEditorBlocks } from '../change-detection/subscribe-store';
-import { persistSnapshotIfChanged } from '../snapshots/snapshot-service';
+import {
+	persistSnapshotIfChanged,
+	runSnapshotExpiryCleanup,
+} from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 
+const logError = ( error ) => {
+	// eslint-disable-next-line no-console
+	console.error( 'LEHFG checkpoint error:', error );
+};
+
 // Persists snapshots for all dirty blocks and clears their dirty flags.
-const runCheckpoint = async () => {
+export const runCheckpoint = async () => {
 	if (
 		runtimeState.checkpointInProgress ||
 		runtimeState.isRestoringSnapshot
@@ -50,9 +58,22 @@ export const startCheckpointPersistence = () => {
 	}
 
 	runtimeState.checkpointTimerId = setInterval( () => {
-		runCheckpoint().catch( ( error ) => {
-			// eslint-disable-next-line no-console
-			console.error( 'LEHFG checkpoint error:', error );
-		} );
+		runCheckpoint().catch( logError );
 	}, CHECKPOINT_INTERVAL_MS );
+};
+
+// Saves pending edits and removes expired history when the tab is hidden or closed,
+// so the last minute of work is not lost and cleanup does not depend on the timers.
+export const startFlushOnPageHide = () => {
+	const flush = () => {
+		runCheckpoint().catch( logError );
+		runSnapshotExpiryCleanup().catch( logError );
+	};
+
+	document.addEventListener( 'visibilitychange', () => {
+		if ( document.visibilityState === 'hidden' ) {
+			flush();
+		}
+	} );
+	window.addEventListener( 'pagehide', flush );
 };

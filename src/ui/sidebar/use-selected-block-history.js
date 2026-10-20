@@ -1,19 +1,16 @@
 import { useEffect, useState } from '@wordpress/element';
 
-import { getTrackedBlockId } from '../../identity/block-identity';
 import {
 	listSnapshotsForBlock,
 	subscribeToSnapshotChanges,
 } from '../../snapshots/snapshot-service';
 
-// Loads snapshots for the currently selected block and reloads them when new ones are saved.
-export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
+// Loads snapshots for a tracked block and reloads them when new ones are saved.
+export const useSelectedBlockHistory = ( lehfgBlockId, postId ) => {
 	const [ snapshots, setSnapshots ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( false );
 	const [ error, setError ] = useState( null );
 	const [ revision, setRevision ] = useState( 0 );
-	const selectedBlockId = selectedBlock?.clientId;
-	const lehfgBlockId = getTrackedBlockId( selectedBlock );
 
 	useEffect( () => {
 		if ( ! lehfgBlockId ) {
@@ -30,7 +27,7 @@ export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
 	useEffect( () => {
 		let isMounted = true;
 
-		if ( ! selectedBlockId || ! postId || ! lehfgBlockId ) {
+		if ( ! postId || ! lehfgBlockId ) {
 			setSnapshots( [] );
 			setIsLoading( false );
 			setError( null );
@@ -73,7 +70,7 @@ export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
 		return () => {
 			isMounted = false;
 		};
-	}, [ lehfgBlockId, postId, selectedBlockId, revision ] );
+	}, [ lehfgBlockId, postId, revision ] );
 
 	return { snapshots, isLoading, error };
 };

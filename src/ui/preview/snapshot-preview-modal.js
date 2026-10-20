@@ -1,5 +1,5 @@
-import { Component, useEffect, useState } from '@wordpress/element';
-import { Modal, TabPanel } from '@wordpress/components';
+import { Component, useMemo } from '@wordpress/element';
+import { Button, Modal, TabPanel } from '@wordpress/components';
 import { BlockPreview } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 
@@ -7,6 +7,10 @@ import './styles.css';
 
 import { generateSemanticDiff } from '../../diff/generateSemanticDiff';
 import { reconstructBlockTree } from './reconstruct-block-tree';
+
+const PreviewUnavailable = () => (
+	<div>{ __( 'Preview unavailable for this block type.', 'lehfg' ) }</div>
+);
 
 class PreviewErrorBoundary extends Component {
 	constructor( props ) {
@@ -20,7 +24,7 @@ class PreviewErrorBoundary extends Component {
 
 	render() {
 		if ( this.state.hasError ) {
-			return <div>Preview unavailable for this block type.</div>;
+			return <PreviewUnavailable />;
 		}
 
 		return this.props.children;
@@ -28,10 +32,13 @@ class PreviewErrorBoundary extends Component {
 }
 
 const PreviewPane = ( { title, blockData, className = '' } ) => {
-	const blocks = reconstructBlockTree( blockData );
+	const blocks = useMemo(
+		() => reconstructBlockTree( blockData ),
+		[ blockData ]
+	);
 
 	if ( ! blocks.length ) {
-		return <div>Preview unavailable for this block type.</div>;
+		return <PreviewUnavailable />;
 	}
 
 	return (
@@ -114,19 +121,17 @@ const ChangeSummary = ( { diff } ) => {
 export const SnapshotPreviewModal = ( {
 	isOpen,
 	onRequestClose,
+	onRestore,
 	currentBlock,
 	snapshot,
 } ) => {
-	const [ semanticDiff, setSemanticDiff ] = useState( null );
-
-	useEffect( () => {
-		if ( ! isOpen || ! snapshot ) {
-			setSemanticDiff( null );
-			return;
-		}
-
-		setSemanticDiff( generateSemanticDiff( currentBlock, snapshot ) );
-	}, [ currentBlock, isOpen, snapshot ] );
+	const semanticDiff = useMemo(
+		() =>
+			isOpen && snapshot
+				? generateSemanticDiff( currentBlock, snapshot )
+				: null,
+		[ currentBlock, isOpen, snapshot ]
+	);
 
 	if ( ! isOpen || ! snapshot ) {
 		return null;
@@ -134,7 +139,7 @@ export const SnapshotPreviewModal = ( {
 
 	return (
 		<Modal
-			title="Snapshot Preview"
+			title={ __( 'Snapshot Preview', 'lehfg' ) }
 			onRequestClose={ onRequestClose }
 			size="large"
 			className="lehfg-preview-modal"
@@ -182,6 +187,17 @@ export const SnapshotPreviewModal = ( {
 					</div>
 				) }
 			</TabPanel>
+			<div className="lehfg-preview-modal__footer">
+				<Button variant="tertiary" onClick={ onRequestClose }>
+					{ __( 'Close', 'lehfg' ) }
+				</Button>
+				<Button
+					variant="primary"
+					onClick={ () => onRestore( snapshot ) }
+				>
+					{ __( 'Restore this version', 'lehfg' ) }
+				</Button>
+			</div>
 		</Modal>
 	);
 };

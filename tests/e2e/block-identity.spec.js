@@ -1,72 +1,11 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
-const getBlockIds = ( page ) =>
-	page.evaluate( () =>
-		window.wp.data
-			.select( 'core/block-editor' )
-			.getBlocks()
-			.map( ( block ) => block.attributes.lehfgBlockId || '' )
-	);
-
-const readSnapshots = ( page, blockId ) =>
-	page.evaluate(
-		( id ) =>
-			new Promise( ( resolve, reject ) => {
-				const request = window.indexedDB.open( 'lehfgHistoryDB' );
-				request.onerror = () => reject( request.error );
-				request.onsuccess = () => {
-					const db = request.result;
-					const all = db
-						.transaction( 'snapshots', 'readonly' )
-						.objectStore( 'snapshots' )
-						.getAll();
-					all.onsuccess = () => {
-						db.close();
-						resolve(
-							all.result
-								.filter(
-									( snapshot ) => snapshot.blockId === id
-								)
-								.sort( ( a, b ) => a.timestamp - b.timestamp )
-								.map( ( snapshot ) => ( {
-									blockName: snapshot.blockName,
-									content: snapshot.attributes.content,
-								} ) )
-						);
-					};
-				};
-			} ),
-		blockId
-	);
-
-// Creates and saves a post with one paragraph, then reloads it so the editor starts clean.
-const openSavedPost = async ( { admin, editor, page } ) => {
-	await admin.createNewPost();
-	await editor.insertBlock( {
-		name: 'core/paragraph',
-		attributes: { content: 'Hello' },
-	} );
-	await editor.saveDraft();
-	const postId = await page.evaluate( () =>
-		window.wp.data.select( 'core/editor' ).getCurrentPostId()
-	);
-	await admin.editPost( postId );
-	return postId;
-};
-
-// Selects the paragraph and appends text, which makes it a tracked block.
-const editParagraph = async ( { editor, page }, text = ' world' ) => {
-	await editor.canvas
-		.getByRole( 'document', { name: 'Block: Paragraph' } )
-		.first()
-		.click();
-	await page.keyboard.press( 'End' );
-	await page.keyboard.type( text );
-	await expect
-		.poll( async () => ( await getBlockIds( page ) )[ 0 ] )
-		.toMatch( /^lehfg-/ );
-	return ( await getBlockIds( page ) )[ 0 ];
-};
+const {
+	editParagraph,
+	getBlockIds,
+	openSavedPost,
+	readSnapshotContents,
+} = require( './utils' );
 
 test.describe( 'Block identity', () => {
 	test( 'selecting a block does not change the post', async ( {
@@ -103,7 +42,7 @@ test.describe( 'Block identity', () => {
 		const blockId = await editParagraph( { editor, page } );
 
 		await expect
-			.poll( () => readSnapshots( page, blockId ) )
+			.poll( () => readSnapshotContents( page, blockId ) )
 			.toEqual( [ { blockName: 'core/paragraph', content: 'Hello' } ] );
 
 		await page.evaluate( () =>
@@ -194,7 +133,7 @@ test.describe( 'Block identity', () => {
 				)
 			)
 			.toEqual( [ [ 'core/heading', blockId ] ] );
-		expect( await readSnapshots( page, blockId ) ).toEqual( [
+		expect( await readSnapshotContents( page, blockId ) ).toEqual( [
 			{ blockName: 'core/paragraph', content: 'Hello' },
 		] );
 	} );
@@ -245,7 +184,7 @@ test.describe( 'Block identity', () => {
 
 		expect( await getBlockIds( page ) ).toEqual( [ blockId ] );
 		await expect
-			.poll( () => readSnapshots( page, blockId ) )
+			.poll( () => readSnapshotContents( page, blockId ) )
 			.toEqual( [ { blockName: 'core/paragraph', content: 'Hello' } ] );
 	} );
 } );

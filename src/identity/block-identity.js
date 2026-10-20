@@ -7,6 +7,18 @@ import { runtimeState } from '../state/runtime-state';
 export const getLehfgBlockId = ( block ) =>
 	block?.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] || null;
 
+const trackedIdListeners = new Set();
+
+// Registers a listener called whenever a scan changes which blocks are tracked.
+export const subscribeToTrackedIds = ( listener ) => {
+	trackedIdListeners.add( listener );
+	return () => trackedIdListeners.delete( listener );
+};
+
+export const notifyTrackedIdsChanged = () => {
+	trackedIdListeners.forEach( ( listener ) => listener() );
+};
+
 // Returns the history ID tracked for a block, including one not yet written to its attributes.
 // Duplicates that still carry another block's ID resolve to null.
 export const getTrackedBlockId = ( block ) => {

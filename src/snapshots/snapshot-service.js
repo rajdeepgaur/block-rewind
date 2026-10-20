@@ -1,4 +1,3 @@
-import { SNAPSHOT_TTL_MS } from '../constants';
 import {
 	deleteExpiredSnapshots,
 	getLatestSnapshotByPostAndBlock,
@@ -9,6 +8,8 @@ import {
 	computeBlockHash,
 	serializeBlockState,
 } from '../serialization/serialize-block';
+import { settings } from '../settings';
+import { getStorageStatus } from '../state/storage-status';
 import { generateSnapshotId } from '../utils/generate-id';
 
 const changeListeners = new Set();
@@ -51,7 +52,12 @@ export const findSnapshotByHash = async ( postId, blockId, hash ) => {
 // Persists a block's state under a history ID unless it matches the latest snapshot.
 export const persistSnapshotIfChanged = ( blockId, block, postId ) =>
 	enqueueWrite( async () => {
-		if ( ! postId || ! blockId || ! block ) {
+		if (
+			! postId ||
+			! blockId ||
+			! block ||
+			getStorageStatus() !== 'ready'
+		) {
 			return false;
 		}
 
@@ -72,11 +78,11 @@ export const persistSnapshotIfChanged = ( blockId, block, postId ) =>
 			postId,
 			...serializeBlockState( block ),
 			timestamp: now,
-			expiresAt: now + SNAPSHOT_TTL_MS,
+			expiresAt: now + settings.snapshotTtlMs,
 			hash,
 		};
 
-		await putSnapshot( snapshot );
+		await putSnapshot( snapshot, settings.maxSnapshotsPerBlock );
 		notifySnapshotChange( snapshot );
 		return true;
 	} );

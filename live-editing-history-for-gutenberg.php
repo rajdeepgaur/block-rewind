@@ -57,6 +57,34 @@ function lehfg_is_post_editor_screen() {
 }
 
 /**
+ * Returns the settings passed to the editor runtime.
+ *
+ * @return array
+ */
+function lehfg_get_editor_settings() {
+	/**
+	 * Filters how long block history is kept in the browser, in seconds.
+	 *
+	 * @param int $ttl Retention in seconds. Default 4 hours, minimum 5 minutes.
+	 */
+	$snapshot_ttl = (int) apply_filters( 'lehfg_snapshot_ttl', 4 * HOUR_IN_SECONDS );
+
+	/**
+	 * Filters the maximum number of snapshots kept per block; the oldest are removed first.
+	 *
+	 * @param int $max_snapshots Snapshots per block. Default 100, minimum 5.
+	 */
+	$max_snapshots = (int) apply_filters( 'lehfg_max_snapshots_per_block', 100 );
+
+	return array(
+		// History is stored per site and per user, as browsers share storage per origin.
+		'storageKey'           => substr( md5( home_url() ), 0, 12 ) . '-' . get_current_user_id(),
+		'snapshotTtl'          => max( 5 * MINUTE_IN_SECONDS, $snapshot_ttl ),
+		'maxSnapshotsPerBlock' => max( 5, $max_snapshots ),
+	);
+}
+
+/**
  * Enqueue editor assets for Gutenberg.
  */
 function lehfg_enqueue_block_editor_assets() {
@@ -78,6 +106,12 @@ function lehfg_enqueue_block_editor_assets() {
 		$asset['dependencies'],
 		$asset['version'],
 		true
+	);
+
+	wp_add_inline_script(
+		'lehfg-editor-runtime',
+		'window.lehfgSettings = ' . wp_json_encode( lehfg_get_editor_settings() ) . ';',
+		'before'
 	);
 
 	wp_enqueue_style(

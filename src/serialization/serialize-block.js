@@ -1,4 +1,5 @@
 import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { hasExternalInnerBlocks } from '../utils/external-content';
 
 // Stable strings and hashes are cached per block object. Editor blocks are
 // immutable, so an unchanged block (or subtree) is never serialized twice.
@@ -8,6 +9,12 @@ const hashCache = new WeakMap();
 // Creates a deep-cloned JSON-safe value for deterministic persistence.
 const cloneSerializable = ( value ) =>
 	JSON.parse( JSON.stringify( value ?? null ) );
+
+const getBlockName = ( block ) => block.name || block.blockName || '';
+
+// Inner blocks that belong to another entity are not part of a block's own content.
+const getOwnInnerBlocks = ( block ) =>
+	hasExternalInnerBlocks( block ) ? [] : block.innerBlocks || [];
 
 // Removes the plugin's own block ID from an attributes object.
 const withoutBlockId = ( attributes = {} ) => {
@@ -74,9 +81,9 @@ const getStableBlockString = ( block ) => {
 		return cached;
 	}
 
-	const innerBlocks = ( block.innerBlocks || [] ).map( getStableBlockString );
+	const innerBlocks = getOwnInnerBlocks( block ).map( getStableBlockString );
 	const result = `{"name":${ JSON.stringify(
-		block.name || block.blockName || ''
+		getBlockName( block )
 	) },"attributes":${ stableStringify(
 		withoutBlockId( block.attributes )
 	) },"innerBlocks":[${ innerBlocks.join( ',' ) }]}`;
@@ -105,15 +112,15 @@ export const computeBlockHash = ( block ) => {
 // Inner block IDs are kept so a restore puts them back on the same blocks.
 const serializeInnerBlocks = ( innerBlocks = [] ) =>
 	innerBlocks.map( ( block ) => ( {
-		blockName: block.name || block.blockName,
+		blockName: getBlockName( block ),
 		attributes: cloneSerializable( block.attributes || {} ),
-		innerBlocks: serializeInnerBlocks( block.innerBlocks || [] ),
+		innerBlocks: serializeInnerBlocks( getOwnInnerBlocks( block ) ),
 	} ) );
 
 // Serializes block state used for snapshot storage.
 // The block's own ID is stored on the snapshot record instead of its attributes.
 export const serializeBlockState = ( block ) => ( {
-	blockName: block.name || block.blockName,
+	blockName: getBlockName( block ),
 	attributes: cloneSerializable( withoutBlockId( block.attributes ) ),
-	innerBlocks: serializeInnerBlocks( block.innerBlocks || [] ),
+	innerBlocks: serializeInnerBlocks( getOwnInnerBlocks( block ) ),
 } );

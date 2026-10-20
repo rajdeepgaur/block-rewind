@@ -50,3 +50,27 @@
 	user-select: none;
 	min-height: 160px;
 }
+
+.lehfg-preview-modal__footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 12px;
+	padding-top: 16px;
+	border-top: 1px solid #dcdcde;
+}
+
+.lehfg-sidebar__empty,
+.lehfg-sidebar__actions {
+	padding: 16px;
+}
+
+.lehfg-sidebar__actions {
+	display: flex;
+	gap: 8px;
+	padding: 0;
+}
+
+.lehfg-sidebar__block-type {
+	margin-top: 0;
+	color: #757575;
+}

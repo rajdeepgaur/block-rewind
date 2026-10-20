@@ -86,6 +86,56 @@ describe( 'computeBlockHash', () => {
 	} );
 } );
 
+describe( 'synced content', () => {
+	it( 'leaves the inner blocks of synced patterns out of hashes and snapshots', () => {
+		const group = ( patternContent ) =>
+			paragraph( {}, [
+				{
+					clientId: 'pattern',
+					name: 'core/block',
+					attributes: { ref: 12 },
+					innerBlocks: [ paragraph( { content: patternContent } ) ],
+				},
+			] );
+
+		expect( computeBlockHash( group( 'A' ) ) ).toBe(
+			computeBlockHash( group( 'B' ) )
+		);
+		expect( serializeBlockState( group( 'A' ) ).innerBlocks ).toEqual( [
+			{
+				blockName: 'core/block',
+				attributes: { ref: 12 },
+				innerBlocks: [],
+			},
+		] );
+	} );
+} );
+
+describe( 'navigation blocks', () => {
+	it( 'keeps inline menu items but drops items of a saved menu', () => {
+		const navigation = ( attributes ) => ( {
+			clientId: 'nav',
+			name: 'core/navigation',
+			attributes,
+			innerBlocks: [
+				{
+					clientId: 'link',
+					name: 'core/navigation-link',
+					attributes: { label: 'Home' },
+					innerBlocks: [],
+				},
+			],
+		} );
+
+		expect(
+			serializeBlockState( navigation( {} ) ).innerBlocks
+		).toHaveLength( 1 );
+		expect(
+			serializeBlockState( navigation( { ref: 4 } ) ).innerBlocks
+		).toHaveLength( 0 );
+	} );
+} );
+
 describe( 'serializeBlockState', () => {
 	it( 'drops the block’s own ID but keeps inner block IDs', () => {
 		const state = serializeBlockState(
