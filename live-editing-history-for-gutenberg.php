@@ -14,9 +14,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Registers the block ID attribute for every block type on the server.
+ *
+ * The block renderer REST endpoint rejects attributes that are not registered
+ * server-side, which would break every block previewed with ServerSideRender.
+ *
+ * @param array $args Block type registration arguments.
+ * @return array
+ */
+function lehfg_register_block_id_attribute( $args ) {
+	if ( ! isset( $args['attributes'] ) || ! is_array( $args['attributes'] ) ) {
+		$args['attributes'] = array();
+	}
+
+	if ( ! isset( $args['attributes']['lehfgBlockId'] ) ) {
+		$args['attributes']['lehfgBlockId'] = array(
+			'type' => 'string',
+		);
+	}
+
+	return $args;
+}
+
+add_filter( 'register_block_type_args', 'lehfg_register_block_id_attribute' );
+
+/**
+ * Checks whether the current admin screen is the post editor.
+ *
+ * Block editor assets also load in the Site Editor, Widgets screen and
+ * Customizer, which the history runtime does not support.
+ *
+ * @return bool
+ */
+function lehfg_is_post_editor_screen() {
+	if ( ! function_exists( 'get_current_screen' ) ) {
+		return false;
+	}
+
+	$screen = get_current_screen();
+
+	return $screen && 'post' === $screen->base && $screen->is_block_editor();
+}
+
+/**
  * Enqueue editor assets for Gutenberg.
  */
 function lehfg_enqueue_block_editor_assets() {
+	if ( ! lehfg_is_post_editor_screen() ) {
+		return;
+	}
+
 	$asset_path = plugin_dir_path( __FILE__ ) . 'build/index.asset.php';
 
 	if ( ! file_exists( $asset_path ) ) {
@@ -36,9 +83,10 @@ function lehfg_enqueue_block_editor_assets() {
 	wp_enqueue_style(
 		'lehfg-editor-runtime',
 		plugin_dir_url( __FILE__ ) . 'build/index.css',
-		array(),
+		array( 'wp-components' ),
 		$asset['version']
 	);
+	wp_style_add_data( 'lehfg-editor-runtime', 'rtl', 'replace' );
 }
 
 add_action( 'enqueue_block_editor_assets', 'lehfg_enqueue_block_editor_assets' );

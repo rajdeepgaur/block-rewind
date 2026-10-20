@@ -3,6 +3,7 @@ import { addFilter } from '@wordpress/hooks';
 import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
 
 // Adds the persistent Lehfg block ID to every block type definition.
+// The same attribute is registered server-side in PHP so REST endpoints accept it.
 const registerLehfgBlockAttribute = ( settings = {} ) => {
 	const attributes = settings.attributes || {};
 
