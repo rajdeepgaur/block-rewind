@@ -98,7 +98,9 @@ const ChangeSummary = ( { diff } ) => {
 
 	return (
 		<div className="lehfg-preview-modal__summary">
-			<div className="lehfg-preview-modal__summary-title">{ __( 'Changed:', 'lehfg' ) }</div>
+			<div className="lehfg-preview-modal__summary-title">
+				{ __( 'Changed:', 'lehfg' ) }
+			</div>
 			<ul className="lehfg-preview-modal__summary-list">
 				{ summaryItems.map( ( item ) => (
 					<li key={ item }>{ item }</li>
@@ -109,7 +111,12 @@ const ChangeSummary = ( { diff } ) => {
 };
 
 // Renders the snapshot comparison modal.
-export const SnapshotPreviewModal = ( { isOpen, onRequestClose, currentBlock, snapshot } ) => {
+export const SnapshotPreviewModal = ( {
+	isOpen,
+	onRequestClose,
+	currentBlock,
+	snapshot,
+} ) => {
 	const [ semanticDiff, setSemanticDiff ] = useState( null );
 
 	useEffect( () => {
@@ -155,13 +162,21 @@ export const SnapshotPreviewModal = ( { isOpen, onRequestClose, currentBlock, sn
 							<PreviewPane
 								title={ __( 'Current Block', 'lehfg' ) }
 								blockData={ currentBlock }
-								className={ semanticDiff?.hasChanges ? 'lehfg-preview-modal__panel--current' : '' }
+								className={
+									semanticDiff?.hasChanges
+										? 'lehfg-preview-modal__panel--current'
+										: ''
+								}
 							/>
 						) : (
 							<PreviewPane
 								title={ __( 'Snapshot Version', 'lehfg' ) }
 								blockData={ snapshot }
-								className={ semanticDiff?.hasChanges ? 'lehfg-preview-modal__panel--snapshot' : '' }
+								className={
+									semanticDiff?.hasChanges
+										? 'lehfg-preview-modal__panel--snapshot'
+										: ''
+								}
 							/>
 						) }
 					</div>

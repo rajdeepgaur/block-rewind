@@ -1,7 +1,13 @@
 import { select } from '@wordpress/data';
 
-import { getLehfgBlockId, assignLehfgBlockId } from '../identity/block-identity';
-import { ensureInitialSnapshotForBlock, listSnapshotsForBlock } from '../snapshots/snapshot-service';
+import {
+	getLehfgBlockId,
+	assignLehfgBlockId,
+} from '../identity/block-identity';
+import {
+	ensureInitialSnapshotForBlock,
+	listSnapshotsForBlock,
+} from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 import { generateBlockId } from '../utils/generate-id';
 

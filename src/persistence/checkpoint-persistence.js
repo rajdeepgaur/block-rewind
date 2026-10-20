@@ -1,14 +1,20 @@
 import { select } from '@wordpress/data';
 
 import { CHECKPOINT_INTERVAL_MS } from '../constants';
-import { clearDirtyBlock, getDirtyBlockIds } from '../change-detection/dirty-registry';
+import {
+	clearDirtyBlock,
+	getDirtyBlockIds,
+} from '../change-detection/dirty-registry';
 import { findBlockByLehfgBlockId } from '../selectors/block-tree';
 import { persistSnapshotForBlockIfChanged } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 
 // Persists snapshots for all dirty blocks and clears their dirty flags.
 const runCheckpoint = async () => {
-	if ( runtimeState.checkpointInProgress || runtimeState.isRestoringSnapshot ) {
+	if (
+		runtimeState.checkpointInProgress ||
+		runtimeState.isRestoringSnapshot
+	) {
 		return;
 	}
 

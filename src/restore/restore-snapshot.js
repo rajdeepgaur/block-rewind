@@ -5,8 +5,14 @@ import { select } from '@wordpress/data';
 import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
 import { findBlockByLehfgBlockId } from '../selectors/block-tree';
 import { runtimeState } from '../state/runtime-state';
-import { getSnapshotByHashForBlock, persistRecoverySnapshotForBlockIfChanged } from '../snapshots/snapshot-service';
-import { computeSerializedHash, serializeBlockState } from '../serialization/serialize-block';
+import {
+	getSnapshotByHashForBlock,
+	persistRecoverySnapshotForBlockIfChanged,
+} from '../snapshots/snapshot-service';
+import {
+	computeSerializedHash,
+	serializeBlockState,
+} from '../serialization/serialize-block';
 
 // Rebuilds nested block instances from serialized snapshot inner blocks.
 const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
@@ -48,9 +54,17 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 	try {
 		const postId = select( 'core/editor' ).getCurrentPostId();
 		if ( postId ) {
-
-			if ( ! ( await getSnapshotByHashForBlock( postId, snapshot.blockId, currentHash ) ) ) {
-				await persistRecoverySnapshotForBlockIfChanged( targetBlock, postId );
+			if (
+				! ( await getSnapshotByHashForBlock(
+					postId,
+					snapshot.blockId,
+					currentHash
+				) )
+			) {
+				await persistRecoverySnapshotForBlockIfChanged(
+					targetBlock,
+					postId
+				);
 			}
 		}
 
@@ -63,7 +77,10 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			rehydrateInnerBlocks( snapshot.innerBlocks || [] )
 		);
 
-		dispatch( 'core/block-editor' ).replaceBlock( targetBlock.clientId, replacementBlock );
+		dispatch( 'core/block-editor' ).replaceBlock(
+			targetBlock.clientId,
+			replacementBlock
+		);
 		runtimeState.lastObservedHashes.set(
 			snapshot.blockId,
 			computeSerializedHash( {

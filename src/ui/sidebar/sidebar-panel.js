@@ -7,31 +7,47 @@ import { registerPlugin } from '@wordpress/plugins';
 
 import { getLehfgBlockId } from '../../identity/block-identity';
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
-import { computeSerializedHash, serializeBlockState } from '../../serialization/serialize-block';
+import {
+	computeSerializedHash,
+	serializeBlockState,
+} from '../../serialization/serialize-block';
 import { useSelectedBlockHistory } from './use-selected-block-history';
 import { SnapshotPreviewModal } from '../preview/snapshot-preview-modal';
 import { formatSnapshotTimestamp } from '../../utils/format-snapshot-timestamp';
 
 // Formats a snapshot timestamp for the history list.
-const formatSnapshotTime = (timestamp) => new Date(timestamp).toLocaleString();
+const formatSnapshotTime = ( timestamp ) =>
+	new Date( timestamp ).toLocaleString();
 
 // Renders the sidebar contents for the selected block history.
 const SidebarContent = () => {
-	const selectedBlock = useSelect((select) => select('core/block-editor').getSelectedBlock(), []);
-	const postId = useSelect((select) => select('core/editor').getCurrentPostId(), []);
-	const { snapshots, isLoading, error } = useSelectedBlockHistory(selectedBlock, postId);
-	const blockId = getLehfgBlockId(selectedBlock);
-	const [activePreviewSnapshot, setActivePreviewSnapshot] = useState(null);
+	const selectedBlock = useSelect(
+		( select ) => select( 'core/block-editor' ).getSelectedBlock(),
+		[]
+	);
+	const postId = useSelect(
+		( select ) => select( 'core/editor' ).getCurrentPostId(),
+		[]
+	);
+	const { snapshots, isLoading, error } = useSelectedBlockHistory(
+		selectedBlock,
+		postId
+	);
+	const blockId = getLehfgBlockId( selectedBlock );
+	const [ activePreviewSnapshot, setActivePreviewSnapshot ] =
+		useState( null );
 
-	const handlePreviewSnapshot = (snapshot) => {
-		if (!selectedBlock) {
+	const handlePreviewSnapshot = ( snapshot ) => {
+		if ( ! selectedBlock ) {
 			return;
 		}
 
-		const currentHash = computeSerializedHash(serializeBlockState(selectedBlock));
+		const currentHash = computeSerializedHash(
+			serializeBlockState( selectedBlock )
+		);
 
-		if (currentHash === snapshot.hash) {
-			dispatch('core/notices').createNotice(
+		if ( currentHash === snapshot.hash ) {
+			dispatch( 'core/notices' ).createNotice(
 				'info',
 				'This snapshot already matches the current block.',
 				{
@@ -41,72 +57,92 @@ const SidebarContent = () => {
 			return;
 		}
 
-		setActivePreviewSnapshot(snapshot);
+		setActivePreviewSnapshot( snapshot );
 	};
 
-	const closePreviewModal = () => setActivePreviewSnapshot(null);
+	const closePreviewModal = () => setActivePreviewSnapshot( null );
 
-	const handleRestoreSnapshot = (snapshot) => {
+	const handleRestoreSnapshot = ( snapshot ) => {
 		closePreviewModal();
-		window.setTimeout(() => {
-			restoreSnapshotToEditor(snapshot);
-		}, 0);
+		window.setTimeout( () => {
+			restoreSnapshotToEditor( snapshot );
+		}, 0 );
 	};
 
-	if (!selectedBlock) {
-		return <div className="lehfg-sidebar__empty">{__('No block selected', 'lehfg')}</div>;
+	if ( ! selectedBlock ) {
+		return (
+			<div className="lehfg-sidebar__empty">
+				{ __( 'No block selected', 'lehfg' ) }
+			</div>
+		);
 	}
 
-	if (!blockId) {
-		return <div className="lehfg-sidebar__empty">{__('No history available for this block', 'lehfg')}</div>;
+	if ( ! blockId ) {
+		return (
+			<div className="lehfg-sidebar__empty">
+				{ __( 'No history available for this block', 'lehfg' ) }
+			</div>
+		);
 	}
 
-	if (isLoading) {
+	if ( isLoading ) {
 		return <Spinner />;
 	}
 
-	if (error) {
-		return <div className="lehfg-sidebar__empty">{__('No history available for this block', 'lehfg')}</div>;
+	if ( error ) {
+		return (
+			<div className="lehfg-sidebar__empty">
+				{ __( 'No history available for this block', 'lehfg' ) }
+			</div>
+		);
 	}
 
-	if (snapshots.length === 0) {
-		return <div className="lehfg-sidebar__empty">{__('No history available for this block', 'lehfg')}</div>;
+	if ( snapshots.length === 0 ) {
+		return (
+			<div className="lehfg-sidebar__empty">
+				{ __( 'No history available for this block', 'lehfg' ) }
+			</div>
+		);
 	}
 
 	return (
 		<>
 			<div className="lehfg-sidebar__history">
-				{snapshots.map((snapshot) => (
+				{ snapshots.map( ( snapshot ) => (
 					<PanelBody
-						key={snapshot.snapshotId}
-						title={formatSnapshotTimestamp(snapshot.timestamp)}
-						initialOpen={false}
+						key={ snapshot.snapshotId }
+						title={ formatSnapshotTimestamp( snapshot.timestamp ) }
+						initialOpen={ false }
 					>
-						<p>{snapshot.blockName}</p>
+						<p>{ snapshot.blockName }</p>
 						<div>
 							<Button
 								variant="secondary"
-								onClick={() => handlePreviewSnapshot(snapshot)}
-								style={{ marginRight: '4px' }}
+								onClick={ () =>
+									handlePreviewSnapshot( snapshot )
+								}
+								style={ { marginRight: '4px' } }
 							>
-								{__('Preview', 'lehfg')}
+								{ __( 'Preview', 'lehfg' ) }
 							</Button>
 							<Button
 								variant="secondary"
-								onClick={() => restoreSnapshotToEditor(snapshot)}
+								onClick={ () =>
+									restoreSnapshotToEditor( snapshot )
+								}
 							>
-								{__('Restore', 'lehfg')}
+								{ __( 'Restore', 'lehfg' ) }
 							</Button>
 						</div>
 					</PanelBody>
-				))}
+				) ) }
 			</div>
 			<SnapshotPreviewModal
-				isOpen={Boolean(activePreviewSnapshot)}
-				onRequestClose={closePreviewModal}
-				onRestore={handleRestoreSnapshot}
-				currentBlock={selectedBlock}
-				snapshot={activePreviewSnapshot}
+				isOpen={ Boolean( activePreviewSnapshot ) }
+				onRequestClose={ closePreviewModal }
+				onRestore={ handleRestoreSnapshot }
+				currentBlock={ selectedBlock }
+				snapshot={ activePreviewSnapshot }
 			/>
 		</>
 	);
@@ -114,16 +150,20 @@ const SidebarContent = () => {
 
 // Registers the Gutenberg sidebar and its toolbar menu item.
 export const registerHistorySidebar = () => {
-	registerPlugin('lehfg-sidebar', {
+	registerPlugin( 'lehfg-sidebar', {
 		render: () => (
 			<>
 				<PluginSidebarMoreMenuItem target="lehfg-sidebar">
-					{__('Live Editing History', 'lehfg')}
+					{ __( 'Live Editing History', 'lehfg' ) }
 				</PluginSidebarMoreMenuItem>
-				<PluginSidebar name="lehfg-sidebar" title={__('Live Editing History', 'lehfg')} icon="backup">
+				<PluginSidebar
+					name="lehfg-sidebar"
+					title={ __( 'Live Editing History', 'lehfg' ) }
+					icon="backup"
+				>
 					<SidebarContent />
 				</PluginSidebar>
 			</>
 		),
-	});
+	} );
 };

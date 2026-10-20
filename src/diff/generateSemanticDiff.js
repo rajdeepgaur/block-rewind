@@ -1,11 +1,20 @@
 import { extractComparableData } from './extractComparableData';
 
-const isPlainObject = ( value ) => Boolean( value ) && typeof value === 'object' && ! Array.isArray( value );
+const isPlainObject = ( value ) =>
+	Boolean( value ) && typeof value === 'object' && ! Array.isArray( value );
 
-const areValuesEqual = ( leftValue, rightValue ) => JSON.stringify( leftValue ) === JSON.stringify( rightValue );
+const areValuesEqual = ( leftValue, rightValue ) =>
+	JSON.stringify( leftValue ) === JSON.stringify( rightValue );
 
-const diffAttributePaths = ( currentAttributes, snapshotAttributes, prefix = '' ) => {
-	const keys = new Set( [ ...Object.keys( currentAttributes || {} ), ...Object.keys( snapshotAttributes || {} ) ] );
+const diffAttributePaths = (
+	currentAttributes,
+	snapshotAttributes,
+	prefix = ''
+) => {
+	const keys = new Set( [
+		...Object.keys( currentAttributes || {} ),
+		...Object.keys( snapshotAttributes || {} ),
+	] );
 	const changedPaths = [];
 
 	for ( const key of keys ) {
@@ -18,7 +27,9 @@ const diffAttributePaths = ( currentAttributes, snapshotAttributes, prefix = '' 
 		const path = prefix ? `${ prefix }.${ key }` : key;
 
 		if ( isPlainObject( currentValue ) && isPlainObject( snapshotValue ) ) {
-			changedPaths.push( ...diffAttributePaths( currentValue, snapshotValue, path ) );
+			changedPaths.push(
+				...diffAttributePaths( currentValue, snapshotValue, path )
+			);
 			continue;
 		}
 
@@ -54,15 +65,27 @@ const compareInnerBlocks = ( currentInnerBlocks, snapshotInnerBlocks ) => {
 			return true;
 		}
 
-		if ( currentInnerBlock.textContent !== snapshotInnerBlock.textContent ) {
+		if (
+			currentInnerBlock.textContent !== snapshotInnerBlock.textContent
+		) {
 			return true;
 		}
 
-		if ( ! areValuesEqual( currentInnerBlock.attributes, snapshotInnerBlock.attributes ) ) {
+		if (
+			! areValuesEqual(
+				currentInnerBlock.attributes,
+				snapshotInnerBlock.attributes
+			)
+		) {
 			return true;
 		}
 
-		if ( compareInnerBlocks( currentInnerBlock.innerBlocks || [], snapshotInnerBlock.innerBlocks || [] ) ) {
+		if (
+			compareInnerBlocks(
+				currentInnerBlock.innerBlocks || [],
+				snapshotInnerBlock.innerBlocks || []
+			)
+		) {
 			return true;
 		}
 	}
@@ -85,16 +108,26 @@ export const generateSemanticDiff = ( currentBlock, snapshotBlock ) => {
 		};
 	}
 
-	const blockTypeChanged = currentComparableData.blockName !== snapshotComparableData.blockName;
-	const textChanged = currentComparableData.textContent !== snapshotComparableData.textContent;
-	const attributesChanged = diffAttributePaths( currentComparableData.attributes, snapshotComparableData.attributes );
+	const blockTypeChanged =
+		currentComparableData.blockName !== snapshotComparableData.blockName;
+	const textChanged =
+		currentComparableData.textContent !==
+		snapshotComparableData.textContent;
+	const attributesChanged = diffAttributePaths(
+		currentComparableData.attributes,
+		snapshotComparableData.attributes
+	);
 	const innerBlocksChanged = compareInnerBlocks(
 		currentComparableData.innerBlocks || [],
 		snapshotComparableData.innerBlocks || []
 	);
 
 	return {
-		hasChanges: blockTypeChanged || textChanged || attributesChanged.length > 0 || innerBlocksChanged,
+		hasChanges:
+			blockTypeChanged ||
+			textChanged ||
+			attributesChanged.length > 0 ||
+			innerBlocksChanged,
 		blockTypeChanged,
 		textChanged,
 		attributesChanged,

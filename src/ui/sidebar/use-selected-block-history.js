@@ -32,7 +32,13 @@ export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
 					return;
 				}
 
-				setSnapshots( loadedSnapshots.slice().sort( ( left, right ) => right.timestamp - left.timestamp ) );
+				setSnapshots(
+					loadedSnapshots
+						.slice()
+						.sort(
+							( left, right ) => right.timestamp - left.timestamp
+						)
+				);
 			} )
 			.catch( ( loadError ) => {
 				if ( ! isMounted ) {

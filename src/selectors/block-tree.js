@@ -30,5 +30,10 @@ export const findBlockByLehfgBlockId = ( blockId ) => {
 	}
 
 	const allBlocks = getAllEditorBlocks();
-	return allBlocks.find( ( block ) => block.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] === blockId ) || null;
+	return (
+		allBlocks.find(
+			( block ) =>
+				block.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] === blockId
+		) || null
+	);
 };

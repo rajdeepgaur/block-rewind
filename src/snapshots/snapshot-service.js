@@ -6,11 +6,15 @@ import {
 	putSnapshot,
 } from '../db/indexeddb';
 import { getLehfgBlockId } from '../identity/block-identity';
-import { computeSerializedHash, serializeBlockState } from '../serialization/serialize-block';
+import {
+	computeSerializedHash,
+	serializeBlockState,
+} from '../serialization/serialize-block';
 import { generateSnapshotId } from '../utils/generate-id';
 
 // Fetches all snapshots for a specific block in the current post.
-export const listSnapshotsForBlock = ( postId, blockId ) => getSnapshotsByPostAndBlock( postId, blockId );
+export const listSnapshotsForBlock = ( postId, blockId ) =>
+	getSnapshotsByPostAndBlock( postId, blockId );
 
 // Fetches a persisted snapshot for a block by its stored hash.
 export const getSnapshotByHashForBlock = async ( postId, blockId, hash ) => {
@@ -23,7 +27,8 @@ export const getSnapshotByHashForBlock = async ( postId, blockId, hash ) => {
 };
 
 // Fetches the latest persisted snapshot for a block in the current post.
-export const getLatestSnapshotForBlock = ( postId, blockId ) => getLatestSnapshotByPostAndBlock( postId, blockId );
+export const getLatestSnapshotForBlock = ( postId, blockId ) =>
+	getLatestSnapshotByPostAndBlock( postId, blockId );
 
 // Persists a snapshot only when serialized block state changed.
 export const persistSnapshotForBlockIfChanged = async ( block, postId ) => {
@@ -35,7 +40,10 @@ export const persistSnapshotForBlockIfChanged = async ( block, postId ) => {
 
 	const serializedState = serializeBlockState( block );
 	const hash = computeSerializedHash( serializedState );
-	const latestSnapshot = await getLatestSnapshotByPostAndBlock( postId, blockId );
+	const latestSnapshot = await getLatestSnapshotByPostAndBlock(
+		postId,
+		blockId
+	);
 
 	if ( latestSnapshot?.hash === hash ) {
 		return false;
@@ -59,8 +67,10 @@ export const persistSnapshotForBlockIfChanged = async ( block, postId ) => {
 };
 
 // Persists the current live block state as a recovery snapshot when it differs from the latest saved state.
-export const persistRecoverySnapshotForBlockIfChanged = async ( block, postId ) =>
-	persistSnapshotForBlockIfChanged( block, postId );
+export const persistRecoverySnapshotForBlockIfChanged = async (
+	block,
+	postId
+) => persistSnapshotForBlockIfChanged( block, postId );
 
 // Creates the first snapshot for a block if history is empty.
 export const ensureInitialSnapshotForBlock = async ( block, postId ) => {

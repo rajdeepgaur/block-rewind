@@ -1,5 +1,6 @@
 // Creates a deep-cloned JSON-safe value for deterministic persistence.
-const cloneSerializable = ( value ) => JSON.parse( JSON.stringify( value ?? null ) );
+const cloneSerializable = ( value ) =>
+	JSON.parse( JSON.stringify( value ?? null ) );
 
 // Recursively serializes inner blocks into a persistence-friendly shape.
 const serializeInnerBlocks = ( innerBlocks = [] ) =>
@@ -21,4 +22,5 @@ export const serializeBlockState = ( block ) => {
 };
 
 // Produces a stable string fingerprint for change detection.
-export const computeSerializedHash = ( serializedState ) => JSON.stringify( serializedState );
+export const computeSerializedHash = ( serializedState ) =>
+	JSON.stringify( serializedState );

@@ -52,9 +52,13 @@ export const openHistoryDatabase = () => {
 					keyPath: 'snapshotId',
 				} );
 
-				snapshotStore.createIndex( 'byPostBlock', [ 'postId', 'blockId' ], {
-					unique: false,
-				} );
+				snapshotStore.createIndex(
+					'byPostBlock',
+					[ 'postId', 'blockId' ],
+					{
+						unique: false,
+					}
+				);
 
 				snapshotStore.createIndex( 'byExpiresAt', 'expiresAt', {
 					unique: false,
@@ -83,7 +87,11 @@ export const getSnapshotsByPostAndBlock = async ( postId, blockId ) => {
 
 	return withStore( 'readonly', async ( store ) => {
 		const keyRange = IDBKeyRange.only( [ postId, blockId ] );
-		const snapshots = await readAllByIndex( store, 'byPostBlock', keyRange );
+		const snapshots = await readAllByIndex(
+			store,
+			'byPostBlock',
+			keyRange
+		);
 
 		snapshots.sort( ( a, b ) => a.timestamp - b.timestamp );
 		return snapshots;

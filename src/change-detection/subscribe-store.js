@@ -3,13 +3,17 @@ import { select, subscribe } from '@wordpress/data';
 import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
 import { markBlockDirty, pruneDirtyBlocks } from './dirty-registry';
 import { initializeBlockFromSelection } from '../selection/initialize-from-selection';
-import { computeSerializedHash, serializeBlockState } from '../serialization/serialize-block';
+import {
+	computeSerializedHash,
+	serializeBlockState,
+} from '../serialization/serialize-block';
 import { getAllEditorBlocks } from '../selectors/block-tree';
 import { runtimeState } from '../state/runtime-state';
 
 // Detects selection changes and runs one-time initialization for that block.
 const trackSelectionChange = async () => {
-	const currentSelectedClientId = select( 'core/block-editor' ).getSelectedBlockClientId();
+	const currentSelectedClientId =
+		select( 'core/block-editor' ).getSelectedBlockClientId();
 
 	if ( currentSelectedClientId === runtimeState.previousSelectedClientId ) {
 		return;
@@ -47,7 +51,9 @@ const trackDirtyBlocks = () => {
 		}
 	}
 
-	for ( const observedBlockId of Array.from( runtimeState.lastObservedHashes.keys() ) ) {
+	for ( const observedBlockId of Array.from(
+		runtimeState.lastObservedHashes.keys()
+	) ) {
 		if ( ! currentBlockIds.has( observedBlockId ) ) {
 			runtimeState.lastObservedHashes.delete( observedBlockId );
 		}
