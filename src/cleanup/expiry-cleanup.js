@@ -11,7 +11,7 @@ export const startExpiryCleanupScheduler = () => {
 	runtimeState.cleanupTimerId = setInterval( () => {
 		runSnapshotExpiryCleanup().catch( ( error ) => {
 			// eslint-disable-next-line no-console
-			console.error( 'LEHFG cleanup error:', error );
+			console.error( 'Block Rewind cleanup error:', error );
 		} );
 	}, EXPIRY_CLEANUP_INTERVAL_MS );
 };

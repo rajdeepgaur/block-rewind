@@ -10,6 +10,6 @@ domReady( () => {
 	initializeHistoryRuntime().catch( ( error ) => {
 		// Keep failure visible in development while avoiding editor crash.
 		// eslint-disable-next-line no-console
-		console.error( 'LEHFG initialization error:', error );
+		console.error( 'Block Rewind initialization error:', error );
 	} );
 } );

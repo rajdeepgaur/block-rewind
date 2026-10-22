@@ -1,12 +1,17 @@
 import { startStoreSubscription } from '../change-detection/subscribe-store';
 import { startExpiryCleanupScheduler } from '../cleanup/expiry-cleanup';
 import { openHistoryDatabase } from '../db/indexeddb';
-import { startCheckpointPersistence } from '../persistence/checkpoint-persistence';
+import {
+	startCheckpointPersistence,
+	startFlushOnPageHide,
+} from '../persistence/checkpoint-persistence';
 import { runSnapshotExpiryCleanup } from '../snapshots/snapshot-service';
+import { setStorageStatus } from '../state/storage-status';
 
 let initialized = false;
 
 // Initializes database, cleanup, and reactive schedulers exactly once.
+// Without browser storage nothing is tracked, so no block IDs are written either.
 export const initializeHistoryRuntime = async () => {
 	if ( initialized ) {
 		return;
@@ -14,10 +19,27 @@ export const initializeHistoryRuntime = async () => {
 
 	initialized = true;
 
-	await openHistoryDatabase();
-	await runSnapshotExpiryCleanup();
+	try {
+		await openHistoryDatabase();
+	} catch ( error ) {
+		setStorageStatus( 'unavailable' );
+		// eslint-disable-next-line no-console
+		console.warn(
+			'Block Rewind: block history is disabled because browser storage is unavailable.',
+			error
+		);
+		return;
+	}
+
+	setStorageStatus( 'ready' );
+
+	await runSnapshotExpiryCleanup().catch( ( error ) => {
+		// eslint-disable-next-line no-console
+		console.error( 'Block Rewind cleanup error:', error );
+	} );
 
 	startStoreSubscription();
 	startCheckpointPersistence();
 	startExpiryCleanupScheduler();
+	startFlushOnPageHide();
 };

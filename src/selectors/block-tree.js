@@ -1,10 +1,14 @@
 import { select } from '@wordpress/data';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { hasExternalInnerBlocks } from '../utils/external-content';
 
-// Flattens a nested block tree into a single list.
+// Flattens a nested block tree into a single list of trackable blocks.
 const flattenBlocks = ( blocks, collector = [] ) => {
 	for ( const block of blocks ) {
+		if ( hasExternalInnerBlocks( block ) ) {
+			continue;
+		}
+
 		collector.push( block );
 
 		if ( block.innerBlocks?.length ) {
@@ -21,14 +25,4 @@ export const getAllEditorBlocks = () => {
 	const topLevelBlocks = blockEditorSelect.getBlocks() || [];
 
 	return flattenBlocks( topLevelBlocks );
-};
-
-// Finds a block in the editor by its persistent plugin ID.
-export const findBlockByLehfgBlockId = ( blockId ) => {
-	if ( ! blockId ) {
-		return null;
-	}
-
-	const allBlocks = getAllEditorBlocks();
-	return allBlocks.find( ( block ) => block.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] === blockId ) || null;
 };

@@ -1,10 +1,17 @@
 {
-  "plugins": [
-    "."
-  ],
-  "config": {
-    "WP_DEBUG": true,
-    "SCRIPT_DEBUG": true
-  },
-    "phpmyadmin": true
+	"plugins": [ "." ],
+	"config": {
+		"WP_DEBUG": true,
+		"SCRIPT_DEBUG": true
+	},
+	"env": {
+		"development": {
+			"phpmyadminPort": 9000
+		},
+		"tests": {
+			"mappings": {
+				"wp-content/mu-plugins": "./tests/e2e/mu-plugins"
+			}
+		}
+	}
 }

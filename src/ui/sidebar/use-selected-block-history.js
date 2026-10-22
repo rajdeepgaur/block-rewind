@@ -1,20 +1,33 @@
 import { useEffect, useState } from '@wordpress/element';
 
-import { getLehfgBlockId } from '../../identity/block-identity';
-import { listSnapshotsForBlock } from '../../snapshots/snapshot-service';
+import {
+	listSnapshotsForBlock,
+	subscribeToSnapshotChanges,
+} from '../../snapshots/snapshot-service';
 
-// Loads snapshots for the currently selected block.
-export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
+// Loads snapshots for a tracked block and reloads them when new ones are saved.
+export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 	const [ snapshots, setSnapshots ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( false );
 	const [ error, setError ] = useState( null );
-	const selectedBlockId = selectedBlock?.clientId;
-	const lehfgBlockId = getLehfgBlockId( selectedBlock );
+	const [ revision, setRevision ] = useState( 0 );
+
+	useEffect( () => {
+		if ( ! blockRewindId ) {
+			return undefined;
+		}
+
+		return subscribeToSnapshotChanges( ( snapshot ) => {
+			if ( snapshot.blockId === blockRewindId ) {
+				setRevision( ( value ) => value + 1 );
+			}
+		} );
+	}, [ blockRewindId ] );
 
 	useEffect( () => {
 		let isMounted = true;
 
-		if ( ! selectedBlockId || ! postId || ! lehfgBlockId ) {
+		if ( ! postId || ! blockRewindId ) {
 			setSnapshots( [] );
 			setIsLoading( false );
 			setError( null );
@@ -26,13 +39,19 @@ export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
 		setIsLoading( true );
 		setError( null );
 
-		listSnapshotsForBlock( postId, lehfgBlockId )
+		listSnapshotsForBlock( postId, blockRewindId )
 			.then( ( loadedSnapshots ) => {
 				if ( ! isMounted ) {
 					return;
 				}
 
-				setSnapshots( loadedSnapshots.slice().sort( ( left, right ) => right.timestamp - left.timestamp ) );
+				setSnapshots(
+					loadedSnapshots
+						.slice()
+						.sort(
+							( left, right ) => right.timestamp - left.timestamp
+						)
+				);
 			} )
 			.catch( ( loadError ) => {
 				if ( ! isMounted ) {
@@ -51,7 +70,7 @@ export const useSelectedBlockHistory = ( selectedBlock, postId ) => {
 		return () => {
 			isMounted = false;
 		};
-	}, [ lehfgBlockId, postId, selectedBlockId ] );
+	}, [ blockRewindId, postId, revision ] );
 
 	return { snapshots, isLoading, error };
 };

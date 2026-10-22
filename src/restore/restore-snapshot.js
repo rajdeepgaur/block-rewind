@@ -1,12 +1,36 @@
-import { createBlock } from '@wordpress/blocks';
-import { dispatch } from '@wordpress/data';
-import { select } from '@wordpress/data';
+import { createBlock, getBlockType } from '@wordpress/blocks';
+import { dispatch, select } from '@wordpress/data';
+import { __, sprintf } from '@wordpress/i18n';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
-import { findBlockByLehfgBlockId } from '../selectors/block-tree';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
+import { getTrackedBlock } from '../change-detection/subscribe-store';
+import { claimBlockId } from '../identity/resolve-block-identities';
+import { computeBlockHash } from '../serialization/serialize-block';
+import {
+	findSnapshotByHash,
+	persistSnapshotIfChanged,
+} from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
-import { getSnapshotByHashForBlock, persistRecoverySnapshotForBlockIfChanged } from '../snapshots/snapshot-service';
-import { computeSerializedHash, serializeBlockState } from '../serialization/serialize-block';
+
+const showNotice = ( status, message, options = {} ) =>
+	dispatch( 'core/notices' ).createNotice( status, message, {
+		type: 'snackbar',
+		isDismissible: true,
+		...options,
+	} );
+
+// Collects block types used by a snapshot that are no longer registered.
+const findMissingBlockTypes = ( node, missing = new Set() ) => {
+	if ( ! getBlockType( node.blockName ) ) {
+		missing.add( node.blockName );
+	}
+
+	( node.innerBlocks || [] ).forEach( ( innerBlock ) =>
+		findMissingBlockTypes( innerBlock, missing )
+	);
+
+	return missing;
+};
 
 // Rebuilds nested block instances from serialized snapshot inner blocks.
 const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
@@ -18,70 +42,197 @@ const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
 		)
 	);
 
-// Replaces the current editor block content with a stored snapshot.
-export const restoreSnapshotToEditor = async ( snapshot ) => {
-	if ( ! snapshot?.blockId ) {
-		return false;
+// Attributes that turn the current block's attributes into exactly the restored ones.
+const getAttributeUpdate = ( currentAttributes, restoredAttributes ) => {
+	const update = { ...restoredAttributes };
+
+	for ( const key of Object.keys( currentAttributes ) ) {
+		if ( ! ( key in restoredAttributes ) ) {
+			update[ key ] = undefined;
+		}
 	}
 
-	const targetBlock = findBlockByLehfgBlockId( snapshot.blockId );
-	if ( ! targetBlock ) {
-		return false;
-	}
+	return update;
+};
 
-	const currentSerializedState = serializeBlockState( targetBlock );
-	const currentHash = computeSerializedHash( currentSerializedState );
+// Restores a snapshot of the same block type in place, keeping the block's client ID
+// and selection. Inner blocks are replaced first; the attribute update is then merged
+// into the same undo step, so a single undo reverts the whole restore.
+const restoreInPlace = ( targetBlock, restoredBlock ) => {
+	const {
+		__unstableMarkNextChangeAsNotPersistent: markNextChangeAsNotPersistent,
+		replaceInnerBlocks,
+		updateBlockAttributes,
+	} = dispatch( 'core/block-editor' );
 
-	if ( snapshot.hash && currentHash === snapshot.hash ) {
-		dispatch( 'core/notices' ).createNotice(
-			'info',
-			'This snapshot is already the current block state.',
-			{
-				dismissible: true,
-			}
+	if ( targetBlock.innerBlocks.length || restoredBlock.innerBlocks.length ) {
+		replaceInnerBlocks(
+			targetBlock.clientId,
+			restoredBlock.innerBlocks,
+			false
 		);
-		return false;
+		markNextChangeAsNotPersistent();
 	}
 
-	runtimeState.isRestoringSnapshot = true;
+	updateBlockAttributes(
+		targetBlock.clientId,
+		getAttributeUpdate( targetBlock.attributes, restoredBlock.attributes )
+	);
+
+	return targetBlock.clientId;
+};
+
+// Replaces the block with the snapshot's block type, if the editor allows it here.
+const restoreAsOtherBlockType = ( targetBlock, restoredBlock ) => {
+	const blockEditorSelect = select( 'core/block-editor' );
+	const rootClientId = blockEditorSelect.getBlockRootClientId(
+		targetBlock.clientId
+	);
+
+	if (
+		! blockEditorSelect.canRemoveBlock( targetBlock.clientId ) ||
+		! blockEditorSelect.canInsertBlockType(
+			restoredBlock.name,
+			rootClientId
+		)
+	) {
+		return null;
+	}
+
+	dispatch( 'core/block-editor' ).replaceBlock(
+		targetBlock.clientId,
+		restoredBlock
+	);
+
+	return blockEditorSelect.getBlock( restoredBlock.clientId )
+		? restoredBlock.clientId
+		: null;
+};
+
+/**
+ * Replaces the current content of a tracked block with a stored snapshot.
+ *
+ * The current state is saved to history first, and the restore is a single undo step.
+ *
+ * @param {Object} snapshot Snapshot record from IndexedDB.
+ * @return {Promise<boolean>} Whether the block was restored.
+ */
+export const restoreSnapshotToEditor = async ( snapshot ) => {
+	const blockId = snapshot?.blockId;
+	if ( ! blockId ) {
+		return false;
+	}
 
 	try {
-		const postId = select( 'core/editor' ).getCurrentPostId();
-		if ( postId ) {
-
-			if ( ! ( await getSnapshotByHashForBlock( postId, snapshot.blockId, currentHash ) ) ) {
-				await persistRecoverySnapshotForBlockIfChanged( targetBlock, postId );
-			}
+		const targetBlock = getTrackedBlock( blockId );
+		if ( ! targetBlock ) {
+			showNotice(
+				'error',
+				__(
+					'The block for this version is no longer in the post.',
+					'block-rewind'
+				)
+			);
+			return false;
 		}
 
-		const replacementBlock = createBlock(
+		const currentHash = computeBlockHash( targetBlock );
+		if ( currentHash === snapshot.hash ) {
+			showNotice(
+				'info',
+				__(
+					'This version is already the current content of the block.',
+					'block-rewind'
+				)
+			);
+			return false;
+		}
+
+		const missingBlockTypes = Array.from(
+			findMissingBlockTypes( snapshot )
+		);
+		if ( missingBlockTypes.length ) {
+			showNotice(
+				'error',
+				sprintf(
+					/* translators: %s: comma-separated block type names, e.g. "my-plugin/slider". */
+					__(
+						'This version can’t be restored because it uses blocks that are no longer available: %s',
+						'block-rewind'
+					),
+					missingBlockTypes.join( ', ' )
+				)
+			);
+			return false;
+		}
+
+		runtimeState.isRestoringSnapshot = true;
+
+		// Save the current state first so the restore can be reverted from history too.
+		const postId = select( 'core/editor' ).getCurrentPostId();
+		if (
+			postId &&
+			! ( await findSnapshotByHash( postId, blockId, currentHash ) )
+		) {
+			await persistSnapshotIfChanged( blockId, targetBlock, postId );
+		}
+
+		const latestTargetBlock = getTrackedBlock( blockId );
+		if ( ! latestTargetBlock ) {
+			return false;
+		}
+
+		const restoredBlock = createBlock(
 			snapshot.blockName,
 			{
 				...( snapshot.attributes || {} ),
-				[ LEHFG_BLOCK_ID_ATTRIBUTE ]: snapshot.blockId,
+				[ BLOCK_ID_ATTRIBUTE ]: blockId,
 			},
 			rehydrateInnerBlocks( snapshot.innerBlocks || [] )
 		);
 
-		dispatch( 'core/block-editor' ).replaceBlock( targetBlock.clientId, replacementBlock );
-		runtimeState.lastObservedHashes.set(
-			snapshot.blockId,
-			computeSerializedHash( {
-				attributes: {
-					...( snapshot.attributes || {} ),
-					[ LEHFG_BLOCK_ID_ATTRIBUTE ]: snapshot.blockId,
+		const restoredClientId =
+			restoredBlock.name === latestTargetBlock.name
+				? restoreInPlace( latestTargetBlock, restoredBlock )
+				: restoreAsOtherBlockType( latestTargetBlock, restoredBlock );
+
+		if ( ! restoredClientId ) {
+			showNotice(
+				'error',
+				__(
+					'This version can’t be restored here because the block is locked or not allowed in this position.',
+					'block-rewind'
+				)
+			);
+			return false;
+		}
+
+		claimBlockId( runtimeState.identity, restoredClientId, blockId );
+		runtimeState.observedByBlockId.set( blockId, restoredBlock );
+
+		// Record the restore as the newest version, so the history reads as a timeline
+		// even when several versions have identical content.
+		await persistSnapshotIfChanged( blockId, restoredBlock, postId, {
+			restoredFrom: snapshot.timestamp,
+		} );
+
+		showNotice( 'success', __( 'Version restored.', 'block-rewind' ), {
+			actions: [
+				{
+					label: __( 'Undo', 'block-rewind' ),
+					onClick: () => dispatch( 'core/editor' ).undo(),
 				},
-				innerBlocks: snapshot.innerBlocks || [],
-			} )
-		);
-		dispatch( 'core/notices' ).createNotice(
-			'info',
-			'Target snapshot restored successfully',
-			{
-				dismissible: true,
-			}
-		);
+			],
+		} );
 		return true;
+	} catch ( error ) {
+		// eslint-disable-next-line no-console
+		console.error( 'Block Rewind restore error:', error );
+		showNotice(
+			'error',
+			__( 'This version could not be restored.', 'block-rewind' )
+		);
+		return false;
 	} finally {
 		runtimeState.isRestoringSnapshot = false;
 	}

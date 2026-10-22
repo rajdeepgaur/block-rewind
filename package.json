@@ -1,16 +1,21 @@
 {
-  "name": "live-editing-history-for-gutenberg",
+  "name": "block-rewind",
   "version": "0.1.0",
-  "description": "Lightweight, session-based block history system for Gutenberg using IndexedDB.",
+  "description": "Block Rewind – Version History for Blocks. Preview and restore earlier versions of any block; history is kept in the browser.",
   "license": "GPL-2.0-or-later",
   "main": "build/index.js",
   "scripts": {
     "start": "wp-scripts start",
     "build": "wp-scripts build",
     "lint:js": "wp-scripts lint-js",
-    "format": "wp-scripts format"
+    "format": "wp-scripts format",
+    "test:unit": "wp-scripts test-unit-js",
+    "test:e2e": "wp-scripts test-playwright",
+    "wp-env": "wp-env"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@wordpress/e2e-test-utils-playwright": "^1.45.0",
     "@wordpress/env": "^10.39.0",
     "@wordpress/scripts": "^30.0.0"
   }
