@@ -1,9 +1,4 @@
-import {
-	DB_NAME_PREFIX,
-	DB_VERSION,
-	LEGACY_DB_NAME,
-	SNAPSHOT_STORE,
-} from '../constants';
+import { DB_NAME_PREFIX, DB_VERSION, SNAPSHOT_STORE } from '../constants';
 import { settings } from '../settings';
 
 export const DB_NAME = `${ DB_NAME_PREFIX }${ settings.storageKey }`;
@@ -64,7 +59,7 @@ export const openHistoryDatabase = () => {
 		request.onblocked = () => {
 			// eslint-disable-next-line no-console
 			console.warn(
-				'LEHFG: waiting for other editor tabs to release the history database.'
+				'Block Rewind: waiting for other editor tabs to release the history database.'
 			);
 		};
 
@@ -200,12 +195,3 @@ export const deleteExpiredSnapshots = ( now ) =>
 			}
 		};
 	} );
-
-// Removes the pre-release database that was shared across sites and users. Best effort.
-export const deleteLegacyDatabase = () => {
-	try {
-		getIndexedDB()?.deleteDatabase( LEGACY_DB_NAME );
-	} catch ( error ) {
-		// Nothing to clean up.
-	}
-};

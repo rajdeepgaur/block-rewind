@@ -14,7 +14,7 @@ import { computeBlockHash } from '../serialization/serialize-block';
 import { getAllEditorBlocks } from '../selectors/block-tree';
 import { persistSnapshotIfChanged } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
-import { generateBlockId } from '../utils/generate-id';
+import { generateId } from '../utils/generate-id';
 
 const areMapsEqual = ( left, right ) =>
 	left.size === right.size &&
@@ -24,7 +24,7 @@ const areMapsEqual = ( left, right ) =>
 
 const logError = ( error ) => {
 	// eslint-disable-next-line no-console
-	console.error( 'LEHFG block scan error:', error );
+	console.error( 'Block Rewind block scan error:', error );
 };
 
 // Compares two block states; hashes are cached per block object, so this is cheap.
@@ -91,7 +91,7 @@ export const scanEditorBlocks = () => {
 			continue;
 		}
 
-		const blockId = generateBlockId();
+		const blockId = generateId();
 		claimBlockId( runtimeState.identity, block.clientId, blockId );
 		idByClientId.set( block.clientId, blockId );
 		writes.set( block.clientId, blockId );

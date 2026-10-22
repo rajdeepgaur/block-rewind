@@ -10,7 +10,7 @@ import {
 } from '../serialization/serialize-block';
 import { settings } from '../settings';
 import { getStorageStatus } from '../state/storage-status';
-import { generateSnapshotId } from '../utils/generate-id';
+import { generateId } from '../utils/generate-id';
 
 const changeListeners = new Set();
 
@@ -86,7 +86,7 @@ export const persistSnapshotIfChanged = (
 
 		const now = Date.now();
 		const snapshot = {
-			snapshotId: generateSnapshotId(),
+			snapshotId: generateId(),
 			blockId,
 			postId,
 			...serializeBlockState( block ),

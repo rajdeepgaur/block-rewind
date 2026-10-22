@@ -4,9 +4,9 @@ import {
 	resolveBlockIdentities,
 } from '../resolve-block-identities';
 
-const block = ( clientId, lehfgBlockId ) => ( {
+const block = ( clientId, blockRewindId ) => ( {
 	clientId,
-	attributes: lehfgBlockId === undefined ? {} : { lehfgBlockId },
+	attributes: blockRewindId === undefined ? {} : { blockRewindId },
 } );
 
 describe( 'resolveBlockIdentities', () => {

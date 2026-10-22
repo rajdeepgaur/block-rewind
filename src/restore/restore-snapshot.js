@@ -2,7 +2,7 @@ import { createBlock, getBlockType } from '@wordpress/blocks';
 import { dispatch, select } from '@wordpress/data';
 import { __, sprintf } from '@wordpress/i18n';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 import { getTrackedBlock } from '../change-detection/subscribe-store';
 import { claimBlockId } from '../identity/resolve-block-identities';
 import { computeBlockHash } from '../serialization/serialize-block';
@@ -130,7 +130,7 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 				'error',
 				__(
 					'The block for this version is no longer in the post.',
-					'lehfg'
+					'block-rewind'
 				)
 			);
 			return false;
@@ -142,7 +142,7 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 				'info',
 				__(
 					'This version is already the current content of the block.',
-					'lehfg'
+					'block-rewind'
 				)
 			);
 			return false;
@@ -158,7 +158,7 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 					/* translators: %s: comma-separated block type names, e.g. "my-plugin/slider". */
 					__(
 						'This version can’t be restored because it uses blocks that are no longer available: %s',
-						'lehfg'
+						'block-rewind'
 					),
 					missingBlockTypes.join( ', ' )
 				)
@@ -186,7 +186,7 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			snapshot.blockName,
 			{
 				...( snapshot.attributes || {} ),
-				[ LEHFG_BLOCK_ID_ATTRIBUTE ]: blockId,
+				[ BLOCK_ID_ATTRIBUTE ]: blockId,
 			},
 			rehydrateInnerBlocks( snapshot.innerBlocks || [] )
 		);
@@ -201,7 +201,7 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 				'error',
 				__(
 					'This version can’t be restored here because the block is locked or not allowed in this position.',
-					'lehfg'
+					'block-rewind'
 				)
 			);
 			return false;
@@ -216,10 +216,10 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			restoredFrom: snapshot.timestamp,
 		} );
 
-		showNotice( 'success', __( 'Version restored.', 'lehfg' ), {
+		showNotice( 'success', __( 'Version restored.', 'block-rewind' ), {
 			actions: [
 				{
-					label: __( 'Undo', 'lehfg' ),
+					label: __( 'Undo', 'block-rewind' ),
 					onClick: () => dispatch( 'core/editor' ).undo(),
 				},
 			],
@@ -227,10 +227,10 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 		return true;
 	} catch ( error ) {
 		// eslint-disable-next-line no-console
-		console.error( 'LEHFG restore error:', error );
+		console.error( 'Block Rewind restore error:', error );
 		showNotice(
 			'error',
-			__( 'This version could not be restored.', 'lehfg' )
+			__( 'This version could not be restored.', 'block-rewind' )
 		);
 		return false;
 	} finally {

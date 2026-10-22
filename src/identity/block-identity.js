@@ -1,11 +1,11 @@
 import { dispatch } from '@wordpress/data';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 import { runtimeState } from '../state/runtime-state';
 
 // Reads the plugin-specific persistent ID from a block.
-export const getLehfgBlockId = ( block ) =>
-	block?.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] || null;
+export const getBlockIdAttribute = ( block ) =>
+	block?.attributes?.[ BLOCK_ID_ATTRIBUTE ] || null;
 
 const trackedIdListeners = new Set();
 
@@ -42,7 +42,7 @@ export const writeBlockIdAttributes = ( writes ) => {
 	const attributesByClientId = {};
 	for ( const [ clientId, blockId ] of writes ) {
 		attributesByClientId[ clientId ] = {
-			[ LEHFG_BLOCK_ID_ATTRIBUTE ]: blockId,
+			[ BLOCK_ID_ATTRIBUTE ]: blockId,
 		};
 	}
 

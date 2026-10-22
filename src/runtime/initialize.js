@@ -1,6 +1,6 @@
 import { startStoreSubscription } from '../change-detection/subscribe-store';
 import { startExpiryCleanupScheduler } from '../cleanup/expiry-cleanup';
-import { deleteLegacyDatabase, openHistoryDatabase } from '../db/indexeddb';
+import { openHistoryDatabase } from '../db/indexeddb';
 import {
 	startCheckpointPersistence,
 	startFlushOnPageHide,
@@ -25,18 +25,17 @@ export const initializeHistoryRuntime = async () => {
 		setStorageStatus( 'unavailable' );
 		// eslint-disable-next-line no-console
 		console.warn(
-			'LEHFG: block history is disabled because browser storage is unavailable.',
+			'Block Rewind: block history is disabled because browser storage is unavailable.',
 			error
 		);
 		return;
 	}
 
 	setStorageStatus( 'ready' );
-	deleteLegacyDatabase();
 
 	await runSnapshotExpiryCleanup().catch( ( error ) => {
 		// eslint-disable-next-line no-console
-		console.error( 'LEHFG cleanup error:', error );
+		console.error( 'Block Rewind cleanup error:', error );
 	} );
 
 	startStoreSubscription();

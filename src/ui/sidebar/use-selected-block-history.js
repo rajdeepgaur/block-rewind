@@ -6,28 +6,28 @@ import {
 } from '../../snapshots/snapshot-service';
 
 // Loads snapshots for a tracked block and reloads them when new ones are saved.
-export const useSelectedBlockHistory = ( lehfgBlockId, postId ) => {
+export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 	const [ snapshots, setSnapshots ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( false );
 	const [ error, setError ] = useState( null );
 	const [ revision, setRevision ] = useState( 0 );
 
 	useEffect( () => {
-		if ( ! lehfgBlockId ) {
+		if ( ! blockRewindId ) {
 			return undefined;
 		}
 
 		return subscribeToSnapshotChanges( ( snapshot ) => {
-			if ( snapshot.blockId === lehfgBlockId ) {
+			if ( snapshot.blockId === blockRewindId ) {
 				setRevision( ( value ) => value + 1 );
 			}
 		} );
-	}, [ lehfgBlockId ] );
+	}, [ blockRewindId ] );
 
 	useEffect( () => {
 		let isMounted = true;
 
-		if ( ! postId || ! lehfgBlockId ) {
+		if ( ! postId || ! blockRewindId ) {
 			setSnapshots( [] );
 			setIsLoading( false );
 			setError( null );
@@ -39,7 +39,7 @@ export const useSelectedBlockHistory = ( lehfgBlockId, postId ) => {
 		setIsLoading( true );
 		setError( null );
 
-		listSnapshotsForBlock( postId, lehfgBlockId )
+		listSnapshotsForBlock( postId, blockRewindId )
 			.then( ( loadedSnapshots ) => {
 				if ( ! isMounted ) {
 					return;
@@ -70,7 +70,7 @@ export const useSelectedBlockHistory = ( lehfgBlockId, postId ) => {
 		return () => {
 			isMounted = false;
 		};
-	}, [ lehfgBlockId, postId, revision ] );
+	}, [ blockRewindId, postId, revision ] );
 
 	return { snapshots, isLoading, error };
 };

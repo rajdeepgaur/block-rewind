@@ -1,4 +1,4 @@
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 import { hasExternalInnerBlocks } from '../utils/external-content';
 
 // Stable strings and hashes are cached per block object. Editor blocks are
@@ -18,7 +18,7 @@ const getOwnInnerBlocks = ( block ) =>
 
 // Removes the plugin's own block ID from an attributes object.
 const withoutBlockId = ( attributes = {} ) => {
-	const { [ LEHFG_BLOCK_ID_ATTRIBUTE ]: omitted, ...rest } = attributes;
+	const { [ BLOCK_ID_ATTRIBUTE ]: omitted, ...rest } = attributes;
 	return rest;
 };
 

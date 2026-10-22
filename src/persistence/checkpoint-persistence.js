@@ -22,7 +22,7 @@ subscribeToSnapshotChanges( ( snapshot ) => {
 
 const logError = ( error ) => {
 	// eslint-disable-next-line no-console
-	console.error( 'LEHFG checkpoint error:', error );
+	console.error( 'Block Rewind checkpoint error:', error );
 };
 
 const isDue = ( blockId, now ) =>

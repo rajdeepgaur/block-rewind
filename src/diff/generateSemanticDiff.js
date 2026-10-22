@@ -18,7 +18,7 @@ const diffAttributePaths = (
 	const changedPaths = [];
 
 	for ( const key of keys ) {
-		if ( key === 'clientId' || key === 'lehfgBlockId' ) {
+		if ( key === 'clientId' || key === 'blockRewindId' ) {
 			continue;
 		}
 

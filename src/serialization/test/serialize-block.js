@@ -43,8 +43,8 @@ describe( 'computeBlockHash', () => {
 	} );
 
 	it( 'ignores plugin block IDs at every level', () => {
-		const withIds = paragraph( { content: 'Hi', lehfgBlockId: 'id-1' }, [
-			paragraph( { content: 'Inner', lehfgBlockId: 'id-2' } ),
+		const withIds = paragraph( { content: 'Hi', blockRewindId: 'id-1' }, [
+			paragraph( { content: 'Inner', blockRewindId: 'id-2' } ),
 		] );
 		const withoutIds = paragraph( { content: 'Hi' }, [
 			paragraph( { content: 'Inner' } ),
@@ -76,8 +76,8 @@ describe( 'computeBlockHash', () => {
 
 	it( 'matches between an editor block and its stored snapshot', () => {
 		const block = paragraph(
-			{ content: { toJSON: () => 'Hi' }, lehfgBlockId: 'id-1' },
-			[ paragraph( { content: 'Inner', lehfgBlockId: 'id-2' } ) ]
+			{ content: { toJSON: () => 'Hi' }, blockRewindId: 'id-1' },
+			[ paragraph( { content: 'Inner', blockRewindId: 'id-2' } ) ]
 		);
 
 		expect( computeBlockHash( serializeBlockState( block ) ) ).toBe(
@@ -139,8 +139,8 @@ describe( 'navigation blocks', () => {
 describe( 'serializeBlockState', () => {
 	it( 'drops the block’s own ID but keeps inner block IDs', () => {
 		const state = serializeBlockState(
-			paragraph( { content: 'Hi', lehfgBlockId: 'id-1' }, [
-				paragraph( { content: 'Inner', lehfgBlockId: 'id-2' } ),
+			paragraph( { content: 'Hi', blockRewindId: 'id-1' }, [
+				paragraph( { content: 'Inner', blockRewindId: 'id-2' } ),
 			] )
 		);
 
@@ -150,7 +150,7 @@ describe( 'serializeBlockState', () => {
 			innerBlocks: [
 				{
 					blockName: 'core/paragraph',
-					attributes: { content: 'Inner', lehfgBlockId: 'id-2' },
+					attributes: { content: 'Inner', blockRewindId: 'id-2' },
 					innerBlocks: [],
 				},
 			],

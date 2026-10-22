@@ -1,15 +1,15 @@
 import { addFilter } from '@wordpress/hooks';
 
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 import { getTrackedBlockId } from './block-identity';
 import { preserveIdOnTransform } from './preserve-id-on-transform';
 
-// Adds the persistent Lehfg block ID to every block type definition.
+// Adds the persistent Block Rewind ID to every block type definition.
 // The same attribute is registered server-side in PHP so REST endpoints accept it.
-const registerLehfgBlockAttribute = ( settings = {} ) => {
+const registerBlockIdAttribute = ( settings = {} ) => {
 	const attributes = settings.attributes || {};
 
-	if ( attributes[ LEHFG_BLOCK_ID_ATTRIBUTE ] ) {
+	if ( attributes[ BLOCK_ID_ATTRIBUTE ] ) {
 		return settings;
 	}
 
@@ -17,7 +17,7 @@ const registerLehfgBlockAttribute = ( settings = {} ) => {
 		...settings,
 		attributes: {
 			...attributes,
-			[ LEHFG_BLOCK_ID_ATTRIBUTE ]: {
+			[ BLOCK_ID_ATTRIBUTE ]: {
 				type: 'string',
 				default: '',
 			},
@@ -27,13 +27,13 @@ const registerLehfgBlockAttribute = ( settings = {} ) => {
 
 addFilter(
 	'blocks.registerBlockType',
-	'lehfg/register-attributes',
-	registerLehfgBlockAttribute
+	'block-rewind/register-attributes',
+	registerBlockIdAttribute
 );
 
 addFilter(
 	'blocks.switchToBlockType.transformedBlock',
-	'lehfg/preserve-id-on-transform',
+	'block-rewind/preserve-id-on-transform',
 	( transformedBlock, sourceBlocks, index ) =>
 		preserveIdOnTransform(
 			transformedBlock,

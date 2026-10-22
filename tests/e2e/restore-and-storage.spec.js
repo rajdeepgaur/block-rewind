@@ -191,7 +191,7 @@ test.describe( 'Restore', () => {
 			snapshotId: 'e2e-missing',
 			blockId,
 			postId,
-			blockName: 'lehfg-e2e/missing',
+			blockName: 'block-rewind-e2e/missing',
 			attributes: {},
 			innerBlocks: [],
 			// Earlier today than every real version, so it is listed last.
@@ -214,7 +214,7 @@ test.describe( 'Restore', () => {
 			page
 				.locator( '.components-snackbar' )
 				.getByText(
-					/uses blocks that are no longer available: lehfg-e2e\/missing/
+					/uses blocks that are no longer available: block-rewind-e2e\/missing/
 				)
 		).toBeVisible();
 		expect( ( await getFirstBlock( page ) ).content ).toBe( 'Hello world' );
@@ -248,27 +248,15 @@ test.describe( 'Restore', () => {
 } );
 
 test.describe( 'Storage', () => {
-	test( 'keeps history per site and user and removes the shared legacy database', async ( {
+	test( 'keeps history in a database per site and user', async ( {
 		admin,
 		editor,
 		page,
 	} ) => {
-		await admin.createNewPost();
-		await page.evaluate(
-			() =>
-				new Promise( ( resolve ) => {
-					const request = window.indexedDB.open( 'lehfgHistoryDB' );
-					request.onsuccess = () => {
-						request.result.close();
-						resolve();
-					};
-				} )
-		);
-
 		await openSavedPost( { admin, editor, page } );
 
 		const storageKey = await page.evaluate(
-			() => window.lehfgSettings.storageKey
+			() => window.blockRewindSettings.storageKey
 		);
 		expect( storageKey ).toMatch( /^[0-9a-f]{12}-1$/ );
 
@@ -280,7 +268,7 @@ test.describe( 'Storage', () => {
 					)
 				)
 			)
-			.toEqual( [ `lehfg-history-${ storageKey }` ] );
+			.toEqual( [ `block-rewind-history-${ storageKey }` ] );
 	} );
 
 	test( 'saves every edited block when the page is closed', async ( {
@@ -348,11 +336,15 @@ test.describe( 'Storage', () => {
 	} ) => {
 		await context.addCookies( [
 			{
-				name: 'lehfg_e2e_ttl',
+				name: 'block_rewind_e2e_ttl',
 				value: '600',
 				url: 'http://localhost:8889',
 			},
-			{ name: 'lehfg_e2e_max', value: '5', url: 'http://localhost:8889' },
+			{
+				name: 'block_rewind_e2e_max',
+				value: '5',
+				url: 'http://localhost:8889',
+			},
 		] );
 
 		await openSavedPost( { admin, editor, page } );

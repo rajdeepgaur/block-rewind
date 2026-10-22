@@ -5,7 +5,7 @@ const getBlockIds = ( page ) =>
 		window.wp.data
 			.select( 'core/block-editor' )
 			.getBlocks()
-			.map( ( block ) => block.attributes.lehfgBlockId || '' )
+			.map( ( block ) => block.attributes.blockRewindId || '' )
 	);
 
 const getFirstBlock = ( page ) =>
@@ -17,7 +17,7 @@ const getFirstBlock = ( page ) =>
 			clientId: block.clientId,
 			name: block.name,
 			content: String( block.attributes.content ),
-			id: block.attributes.lehfgBlockId,
+			id: block.attributes.blockRewindId,
 		};
 	} );
 
@@ -26,7 +26,7 @@ const withHistoryStore = ( page, mode, callbackSource, argument ) =>
 	page.evaluate(
 		( [ storeMode, source, arg ] ) =>
 			new Promise( ( resolve, reject ) => {
-				const dbName = `lehfg-history-${ window.lehfgSettings.storageKey }`;
+				const dbName = `block-rewind-history-${ window.blockRewindSettings.storageKey }`;
 				const request = window.indexedDB.open( dbName );
 				request.onerror = () => reject( request.error );
 				request.onsuccess = () => {
@@ -102,7 +102,7 @@ const editParagraph = async ( { editor, page }, text = ' world' ) => {
 	await page.keyboard.type( text );
 	await expect
 		.poll( async () => ( await getBlockIds( page ) )[ 0 ] )
-		.toMatch( /^lehfg-/ );
+		.toMatch( /^[0-9a-z]+(-[0-9a-z]+)+$/ );
 	return ( await getBlockIds( page ) )[ 0 ];
 };
 
@@ -125,7 +125,10 @@ const openHistorySidebar = async ( page ) => {
 	await page.evaluate( () =>
 		window.wp.data
 			.dispatch( 'core/interface' )
-			.enableComplementaryArea( 'core', 'lehfg-sidebar/lehfg-sidebar' )
+			.enableComplementaryArea(
+				'core',
+				'block-rewind/block-rewind-sidebar'
+			)
 	);
 	return page.getByRole( 'region', { name: 'Editor settings' } );
 };

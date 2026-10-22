@@ -122,7 +122,7 @@ test.describe( 'Block identity', () => {
 						.getBlocks()
 						.map( ( block ) => [
 							block.name,
-							block.attributes.lehfgBlockId,
+							block.attributes.blockRewindId,
 						] )
 				)
 			)
@@ -148,7 +148,7 @@ test.describe( 'Block identity', () => {
 					.getBlocks();
 				return {
 					content: String( block.attributes.content ),
-					id: block.attributes.lehfgBlockId,
+					id: block.attributes.blockRewindId,
 				};
 			} );
 

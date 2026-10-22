@@ -1,12 +1,13 @@
 <?php
 /**
- * Plugin Name: Live Editing History for Gutenberg
- * Description: Session-based block history tracking for Gutenberg using IndexedDB.
+ * Plugin Name: Block Rewind – Version History for Blocks
+ * Description: Preview and restore earlier versions of any block. Version history is kept in your browser, with nothing stored on the server.
  * Version: 0.1.0
  * Author: Rajdeep Singh Gaur
  * License: GPL-2.0-or-later
+ * Text Domain: block-rewind
  *
- * @package LEHFG
+ * @package BlockRewind
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,13 +23,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param array $args Block type registration arguments.
  * @return array
  */
-function lehfg_register_block_id_attribute( $args ) {
+function block_rewind_register_block_id_attribute( $args ) {
 	if ( ! isset( $args['attributes'] ) || ! is_array( $args['attributes'] ) ) {
 		$args['attributes'] = array();
 	}
 
-	if ( ! isset( $args['attributes']['lehfgBlockId'] ) ) {
-		$args['attributes']['lehfgBlockId'] = array(
+	if ( ! isset( $args['attributes']['blockRewindId'] ) ) {
+		$args['attributes']['blockRewindId'] = array(
 			'type' => 'string',
 		);
 	}
@@ -36,7 +37,7 @@ function lehfg_register_block_id_attribute( $args ) {
 	return $args;
 }
 
-add_filter( 'register_block_type_args', 'lehfg_register_block_id_attribute' );
+add_filter( 'register_block_type_args', 'block_rewind_register_block_id_attribute' );
 
 /**
  * Checks whether the current admin screen is the post editor.
@@ -46,7 +47,7 @@ add_filter( 'register_block_type_args', 'lehfg_register_block_id_attribute' );
  *
  * @return bool
  */
-function lehfg_is_post_editor_screen() {
+function block_rewind_is_post_editor_screen() {
 	if ( ! function_exists( 'get_current_screen' ) ) {
 		return false;
 	}
@@ -61,20 +62,20 @@ function lehfg_is_post_editor_screen() {
  *
  * @return array
  */
-function lehfg_get_editor_settings() {
+function block_rewind_get_editor_settings() {
 	/**
 	 * Filters how long block history is kept in the browser, in seconds.
 	 *
 	 * @param int $ttl Retention in seconds. Default 4 hours, minimum 5 minutes.
 	 */
-	$snapshot_ttl = (int) apply_filters( 'lehfg_snapshot_ttl', 4 * HOUR_IN_SECONDS );
+	$snapshot_ttl = (int) apply_filters( 'block_rewind_snapshot_ttl', 4 * HOUR_IN_SECONDS );
 
 	/**
 	 * Filters the maximum number of snapshots kept per block; the oldest are removed first.
 	 *
 	 * @param int $max_snapshots Snapshots per block. Default 100, minimum 5.
 	 */
-	$max_snapshots = (int) apply_filters( 'lehfg_max_snapshots_per_block', 100 );
+	$max_snapshots = (int) apply_filters( 'block_rewind_max_snapshots_per_block', 100 );
 
 	return array(
 		// History is stored per site and per user, as browsers share storage per origin.
@@ -87,8 +88,8 @@ function lehfg_get_editor_settings() {
 /**
  * Enqueue editor assets for Gutenberg.
  */
-function lehfg_enqueue_block_editor_assets() {
-	if ( ! lehfg_is_post_editor_screen() ) {
+function block_rewind_enqueue_block_editor_assets() {
+	if ( ! block_rewind_is_post_editor_screen() ) {
 		return;
 	}
 
@@ -101,26 +102,28 @@ function lehfg_enqueue_block_editor_assets() {
 	$asset = include $asset_path;
 
 	wp_enqueue_script(
-		'lehfg-editor-runtime',
+		'block-rewind-editor',
 		plugin_dir_url( __FILE__ ) . 'build/index.js',
 		$asset['dependencies'],
 		$asset['version'],
 		true
 	);
 
+	wp_set_script_translations( 'block-rewind-editor', 'block-rewind' );
+
 	wp_add_inline_script(
-		'lehfg-editor-runtime',
-		'window.lehfgSettings = ' . wp_json_encode( lehfg_get_editor_settings() ) . ';',
+		'block-rewind-editor',
+		'window.blockRewindSettings = ' . wp_json_encode( block_rewind_get_editor_settings() ) . ';',
 		'before'
 	);
 
 	wp_enqueue_style(
-		'lehfg-editor-runtime',
+		'block-rewind-editor',
 		plugin_dir_url( __FILE__ ) . 'build/index.css',
 		array( 'wp-components' ),
 		$asset['version']
 	);
-	wp_style_add_data( 'lehfg-editor-runtime', 'rtl', 'replace' );
+	wp_style_add_data( 'block-rewind-editor', 'rtl', 'replace' );
 }
 
-add_action( 'enqueue_block_editor_assets', 'lehfg_enqueue_block_editor_assets' );
+add_action( 'enqueue_block_editor_assets', 'block_rewind_enqueue_block_editor_assets' );

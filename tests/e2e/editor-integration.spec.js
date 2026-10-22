@@ -1,6 +1,6 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
-const RUNTIME_SCRIPT = 'script#lehfg-editor-runtime-js';
+const RUNTIME_SCRIPT = 'script#block-rewind-editor-js';
 
 test.describe( 'Editor integration', () => {
 	test( 'loads the runtime in the post editor', async ( { admin, page } ) => {
@@ -86,7 +86,7 @@ test.describe( 'Editor integration', () => {
 			const response = await window.wp.apiFetch( {
 				path: '/wp/v2/block-renderer/core/archives?context=edit',
 				method: 'POST',
-				data: { attributes: { lehfgBlockId: 'lehfg-e2e' } },
+				data: { attributes: { blockRewindId: 'block-rewind-e2e' } },
 				parse: false,
 			} );
 			return response.status;

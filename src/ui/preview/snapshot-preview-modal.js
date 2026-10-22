@@ -9,7 +9,9 @@ import { generateSemanticDiff } from '../../diff/generateSemanticDiff';
 import { reconstructBlockTree } from './reconstruct-block-tree';
 
 const PreviewUnavailable = () => (
-	<div>{ __( 'Preview unavailable for this block type.', 'lehfg' ) }</div>
+	<div>
+		{ __( 'Preview unavailable for this block type.', 'block-rewind' ) }
+	</div>
 );
 
 class PreviewErrorBoundary extends Component {
@@ -42,9 +44,11 @@ const PreviewPane = ( { title, blockData, className = '' } ) => {
 	}
 
 	return (
-		<div className={ `lehfg-preview-modal__panel ${ className }`.trim() }>
-			<h3 className="lehfg-preview-modal__heading">{ title }</h3>
-			<div className="lehfg-preview-modal__viewport">
+		<div
+			className={ `block-rewind-preview-modal__panel ${ className }`.trim() }
+		>
+			<h3 className="block-rewind-preview-modal__heading">{ title }</h3>
+			<div className="block-rewind-preview-modal__viewport">
 				<PreviewErrorBoundary>
 					<BlockPreview blocks={ blocks } />
 				</PreviewErrorBoundary>
@@ -54,14 +58,14 @@ const PreviewPane = ( { title, blockData, className = '' } ) => {
 };
 
 const ATTRIBUTE_LABELS = {
-	align: __( 'Alignment', 'lehfg' ),
-	backgroundColor: __( 'Background color', 'lehfg' ),
-	textColor: __( 'Text color', 'lehfg' ),
-	content: __( 'Text content', 'lehfg' ),
-	title: __( 'Title text', 'lehfg' ),
-	caption: __( 'Caption text', 'lehfg' ),
-	label: __( 'Label text', 'lehfg' ),
-	placeholder: __( 'Placeholder text', 'lehfg' ),
+	align: __( 'Alignment', 'block-rewind' ),
+	backgroundColor: __( 'Background color', 'block-rewind' ),
+	textColor: __( 'Text color', 'block-rewind' ),
+	content: __( 'Text content', 'block-rewind' ),
+	title: __( 'Title text', 'block-rewind' ),
+	caption: __( 'Caption text', 'block-rewind' ),
+	label: __( 'Label text', 'block-rewind' ),
+	placeholder: __( 'Placeholder text', 'block-rewind' ),
 };
 
 const humanizeAttributePath = ( path ) => {
@@ -84,10 +88,10 @@ const ChangeSummary = ( { diff } ) => {
 
 	if ( ! diff.hasChanges ) {
 		return (
-			<div className="lehfg-preview-modal__summary">
+			<div className="block-rewind-preview-modal__summary">
 				{ __(
 					'This version is identical to the current block.',
-					'lehfg'
+					'block-rewind'
 				) }
 			</div>
 		);
@@ -96,11 +100,11 @@ const ChangeSummary = ( { diff } ) => {
 	const summaryItems = [];
 
 	if ( diff.blockTypeChanged ) {
-		summaryItems.push( __( 'Block type', 'lehfg' ) );
+		summaryItems.push( __( 'Block type', 'block-rewind' ) );
 	}
 
 	if ( diff.textChanged ) {
-		summaryItems.push( __( 'Text content', 'lehfg' ) );
+		summaryItems.push( __( 'Text content', 'block-rewind' ) );
 	}
 
 	diff.attributesChanged.forEach( ( path ) => {
@@ -111,15 +115,15 @@ const ChangeSummary = ( { diff } ) => {
 	} );
 
 	if ( diff.innerBlocksChanged ) {
-		summaryItems.push( __( 'Nested content', 'lehfg' ) );
+		summaryItems.push( __( 'Nested content', 'block-rewind' ) );
 	}
 
 	return (
-		<div className="lehfg-preview-modal__summary">
-			<div className="lehfg-preview-modal__summary-title">
-				{ __( 'Changed:', 'lehfg' ) }
+		<div className="block-rewind-preview-modal__summary">
+			<div className="block-rewind-preview-modal__summary-title">
+				{ __( 'Changed:', 'block-rewind' ) }
 			</div>
-			<ul className="lehfg-preview-modal__summary-list">
+			<ul className="block-rewind-preview-modal__summary-list">
 				{ summaryItems.map( ( item ) => (
 					<li key={ item }>{ item }</li>
 				) ) }
@@ -150,47 +154,50 @@ export const SnapshotPreviewModal = ( {
 
 	return (
 		<Modal
-			title={ __( 'Snapshot Preview', 'lehfg' ) }
+			title={ __( 'Snapshot Preview', 'block-rewind' ) }
 			onRequestClose={ onRequestClose }
 			size="large"
-			className="lehfg-preview-modal"
+			className="block-rewind-preview-modal"
 			shouldCloseOnClickOutside
 		>
 			<ChangeSummary diff={ semanticDiff } />
 			<TabPanel
-				className="lehfg-preview-modal__tabs"
-				activeClass="lehfg-preview-modal__tab--active"
+				className="block-rewind-preview-modal__tabs"
+				activeClass="block-rewind-preview-modal__tab--active"
 				initialTabName="current-block"
 				tabs={ [
 					{
 						name: 'current-block',
-						title: __( 'Current Block', 'lehfg' ),
+						title: __( 'Current Block', 'block-rewind' ),
 					},
 					{
 						name: 'snapshot-version',
-						title: __( 'Snapshot Version', 'lehfg' ),
+						title: __( 'Snapshot Version', 'block-rewind' ),
 					},
 				] }
 			>
 				{ ( tab ) => (
-					<div className="lehfg-preview-modal__content">
+					<div className="block-rewind-preview-modal__content">
 						{ tab.name === 'current-block' ? (
 							<PreviewPane
-								title={ __( 'Current Block', 'lehfg' ) }
+								title={ __( 'Current Block', 'block-rewind' ) }
 								blockData={ currentBlock }
 								className={
 									semanticDiff?.hasChanges
-										? 'lehfg-preview-modal__panel--current'
+										? 'block-rewind-preview-modal__panel--current'
 										: ''
 								}
 							/>
 						) : (
 							<PreviewPane
-								title={ __( 'Snapshot Version', 'lehfg' ) }
+								title={ __(
+									'Snapshot Version',
+									'block-rewind'
+								) }
 								blockData={ snapshot }
 								className={
 									semanticDiff?.hasChanges
-										? 'lehfg-preview-modal__panel--snapshot'
+										? 'block-rewind-preview-modal__panel--snapshot'
 										: ''
 								}
 							/>
@@ -198,15 +205,15 @@ export const SnapshotPreviewModal = ( {
 					</div>
 				) }
 			</TabPanel>
-			<div className="lehfg-preview-modal__footer">
+			<div className="block-rewind-preview-modal__footer">
 				<Button variant="tertiary" onClick={ onRequestClose }>
-					{ __( 'Close', 'lehfg' ) }
+					{ __( 'Close', 'block-rewind' ) }
 				</Button>
 				<Button
 					variant="primary"
 					onClick={ () => onRestore( snapshot ) }
 				>
-					{ __( 'Restore this version', 'lehfg' ) }
+					{ __( 'Restore this version', 'block-rewind' ) }
 				</Button>
 			</div>
 		</Modal>

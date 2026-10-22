@@ -1,7 +1,7 @@
 {
-  "name": "live-editing-history-for-gutenberg",
+  "name": "block-rewind",
   "version": "0.1.0",
-  "description": "Lightweight, session-based block history system for Gutenberg using IndexedDB.",
+  "description": "Block Rewind – Version History for Blocks. Preview and restore earlier versions of any block; history is kept in the browser.",
   "license": "GPL-2.0-or-later",
   "main": "build/index.js",
   "scripts": {

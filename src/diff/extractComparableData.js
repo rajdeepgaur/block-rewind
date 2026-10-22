@@ -25,7 +25,7 @@ const collectTextFragments = ( value, key = '' ) => {
 	if ( typeof value === 'object' ) {
 		return Object.entries( value ).flatMap(
 			( [ childKey, childValue ] ) => {
-				if ( childKey === 'clientId' || childKey === 'lehfgBlockId' ) {
+				if ( childKey === 'clientId' || childKey === 'blockRewindId' ) {
 					return [];
 				}
 
@@ -64,7 +64,7 @@ export const extractComparableData = ( blockData ) => {
 	const blockName = blockData.blockName || blockData.name || '';
 	const attributes = cloneSerializable( blockData.attributes || {} );
 	delete attributes.clientId;
-	delete attributes.lehfgBlockId;
+	delete attributes.blockRewindId;
 
 	const innerBlocks = ( blockData.innerBlocks || [] )
 		.map( ( innerBlock ) => extractComparableData( innerBlock ) )

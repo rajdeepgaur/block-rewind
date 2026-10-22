@@ -1,11 +1,11 @@
 import { preserveIdOnTransform } from '../preserve-id-on-transform';
 
-const resolveFromAttribute = ( block ) => block.attributes.lehfgBlockId;
+const resolveFromAttribute = ( block ) => block.attributes.blockRewindId;
 
 const paragraph = {
 	clientId: 'p',
 	name: 'core/paragraph',
-	attributes: { content: 'Hi', lehfgBlockId: 'id-1' },
+	attributes: { content: 'Hi', blockRewindId: 'id-1' },
 	innerBlocks: [],
 };
 
@@ -26,9 +26,9 @@ describe( 'preserveIdOnTransform', () => {
 
 		expect( result.attributes ).toEqual( {
 			content: 'Hi',
-			lehfgBlockId: 'id-1',
+			blockRewindId: 'id-1',
 		} );
-		expect( heading.attributes.lehfgBlockId ).toBeUndefined();
+		expect( heading.attributes.blockRewindId ).toBeUndefined();
 	} );
 
 	it( 'accepts a single source block instead of an array', () => {
@@ -40,7 +40,7 @@ describe( 'preserveIdOnTransform', () => {
 
 		expect(
 			preserveIdOnTransform( heading, paragraph, 0, resolveFromAttribute )
-				.attributes.lehfgBlockId
+				.attributes.blockRewindId
 		).toBe( 'id-1' );
 	} );
 

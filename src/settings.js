@@ -8,9 +8,9 @@ const readPositiveInteger = ( value, fallback ) => {
 		: fallback;
 };
 
-// Settings printed by PHP before the runtime script (see lehfg_get_editor_settings()).
+// Settings printed by PHP before the runtime script (see block_rewind_get_editor_settings()).
 const rawSettings =
-	( typeof window !== 'undefined' && window.lehfgSettings ) || {};
+	( typeof window !== 'undefined' && window.blockRewindSettings ) || {};
 
 export const settings = {
 	storageKey: String( rawSettings.storageKey || 'default' ),

@@ -1,7 +1,7 @@
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 
 const readBlockIdAttribute = ( block ) =>
-	block?.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] || null;
+	block?.attributes?.[ BLOCK_ID_ATTRIBUTE ] || null;
 
 // Creates the session state used to keep block identities stable.
 export const createIdentityState = () => ( {

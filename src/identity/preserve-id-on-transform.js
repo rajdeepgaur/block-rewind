@@ -1,7 +1,7 @@
-import { LEHFG_BLOCK_ID_ATTRIBUTE } from '../constants';
+import { BLOCK_ID_ATTRIBUTE } from '../constants';
 
 const readBlockIdAttribute = ( block ) =>
-	block?.attributes?.[ LEHFG_BLOCK_ID_ATTRIBUTE ] || null;
+	block?.attributes?.[ BLOCK_ID_ATTRIBUTE ] || null;
 
 const containsBlockId = ( blocks = [], blockId ) =>
 	blocks.some(
@@ -52,7 +52,7 @@ export const preserveIdOnTransform = (
 		...transformedBlock,
 		attributes: {
 			...transformedBlock.attributes,
-			[ LEHFG_BLOCK_ID_ATTRIBUTE ]: blockId,
+			[ BLOCK_ID_ATTRIBUTE ]: blockId,
 		},
 	};
 };

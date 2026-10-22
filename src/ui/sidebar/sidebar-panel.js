@@ -19,7 +19,7 @@ import { SnapshotPreviewModal } from '../preview/snapshot-preview-modal';
 import { formatSnapshotTimestamp } from '../../utils/format-snapshot-timestamp';
 
 const EmptyState = ( { children } ) => (
-	<div className="lehfg-sidebar__empty">{ children }</div>
+	<div className="block-rewind-sidebar__empty">{ children }</div>
 );
 
 const getBlockTitle = ( blockName ) =>
@@ -33,14 +33,14 @@ const formatRetention = ( milliseconds ) => {
 		const hours = minutes / 60;
 		return sprintf(
 			/* translators: %d: number of hours. */
-			_n( '%d hour', '%d hours', hours, 'lehfg' ),
+			_n( '%d hour', '%d hours', hours, 'block-rewind' ),
 			hours
 		);
 	}
 
 	return sprintf(
 		/* translators: %d: number of minutes. */
-		_n( '%d minute', '%d minutes', minutes, 'lehfg' ),
+		_n( '%d minute', '%d minutes', minutes, 'block-rewind' ),
 		minutes
 	);
 };
@@ -56,9 +56,9 @@ const SnapshotItem = ( {
 	const isRestore = Boolean( snapshot.restoredFrom );
 	const title = [
 		formatSnapshotTimestamp( snapshot.timestamp ),
-		isRestore && __( 'Restored', 'lehfg' ),
-		isCurrent && __( 'Current', 'lehfg' ),
-		isEditedSince && __( 'Edited since', 'lehfg' ),
+		isRestore && __( 'Restored', 'block-rewind' ),
+		isCurrent && __( 'Current', 'block-rewind' ),
+		isEditedSince && __( 'Edited since', 'block-rewind' ),
 	]
 		.filter( Boolean )
 		.join( ' · ' );
@@ -67,41 +67,44 @@ const SnapshotItem = ( {
 		<PanelBody
 			title={ title }
 			className={
-				isCurrent ? 'lehfg-sidebar__entry--current' : undefined
+				isCurrent ? 'block-rewind-sidebar__entry--current' : undefined
 			}
 			initialOpen={ false }
 		>
-			<p className="lehfg-sidebar__block-type">
+			<p className="block-rewind-sidebar__block-type">
 				{ getBlockTitle( snapshot.blockName ) }
 			</p>
 			{ isRestore && (
-				<p className="lehfg-sidebar__restored-from">
+				<p className="block-rewind-sidebar__restored-from">
 					{ sprintf(
 						/* translators: %s: date and time of the restored version. */
-						__( 'Restored from the version of %s.', 'lehfg' ),
+						__(
+							'Restored from the version of %s.',
+							'block-rewind'
+						),
 						formatSnapshotTimestamp( snapshot.restoredFrom )
 					) }
 				</p>
 			) }
 			{ isEditedSince && (
-				<p className="lehfg-sidebar__current-note">
+				<p className="block-rewind-sidebar__current-note">
 					{ __(
 						'The block has been edited since this version was saved.',
-						'lehfg'
+						'block-rewind'
 					) }
 				</p>
 			) }
 			{ isCurrent ? (
-				<p className="lehfg-sidebar__current-note">
-					{ __( 'This is how the block looks now.', 'lehfg' ) }
+				<p className="block-rewind-sidebar__current-note">
+					{ __( 'This is how the block looks now.', 'block-rewind' ) }
 				</p>
 			) : (
-				<div className="lehfg-sidebar__actions">
+				<div className="block-rewind-sidebar__actions">
 					<Button variant="secondary" onClick={ onPreview }>
-						{ __( 'Preview', 'lehfg' ) }
+						{ __( 'Preview', 'block-rewind' ) }
 					</Button>
 					<Button variant="secondary" onClick={ onRestore }>
-						{ __( 'Restore', 'lehfg' ) }
+						{ __( 'Restore', 'block-rewind' ) }
 					</Button>
 				</div>
 			) }
@@ -146,7 +149,7 @@ const SidebarContent = () => {
 			<Notice status="warning" isDismissible={ false }>
 				{ __(
 					'Block history is unavailable because this browser does not allow the editor to store data (IndexedDB). This can happen in private browsing windows or when site data is blocked.',
-					'lehfg'
+					'block-rewind'
 				) }
 			</Notice>
 		);
@@ -155,7 +158,7 @@ const SidebarContent = () => {
 	if ( ! selectedBlock ) {
 		return (
 			<EmptyState>
-				{ __( 'Select a block to see its history.', 'lehfg' ) }
+				{ __( 'Select a block to see its history.', 'block-rewind' ) }
 			</EmptyState>
 		);
 	}
@@ -165,7 +168,7 @@ const SidebarContent = () => {
 			<EmptyState>
 				{ __(
 					'No history yet. Edit this block to start recording its history.',
-					'lehfg'
+					'block-rewind'
 				) }
 			</EmptyState>
 		);
@@ -180,7 +183,7 @@ const SidebarContent = () => {
 			<EmptyState>
 				{ __(
 					'The history of this block could not be loaded.',
-					'lehfg'
+					'block-rewind'
 				) }
 			</EmptyState>
 		);
@@ -189,7 +192,7 @@ const SidebarContent = () => {
 	if ( snapshots.length === 0 ) {
 		return (
 			<EmptyState>
-				{ __( 'No history available for this block.', 'lehfg' ) }
+				{ __( 'No history available for this block.', 'block-rewind' ) }
 			</EmptyState>
 		);
 	}
@@ -204,7 +207,7 @@ const SidebarContent = () => {
 
 	return (
 		<>
-			<div className="lehfg-sidebar__history">
+			<div className="block-rewind-sidebar__history">
 				{ snapshots.map( ( snapshot, index ) => (
 					<SnapshotItem
 						key={ snapshot.snapshotId }
@@ -216,12 +219,12 @@ const SidebarContent = () => {
 					/>
 				) ) }
 			</div>
-			<p className="lehfg-sidebar__help">
+			<p className="block-rewind-sidebar__help">
 				{ sprintf(
 					/* translators: %s: retention period, e.g. "4 hours". */
 					__(
 						'Versions are saved automatically about once a minute while you edit, and kept in this browser for %s.',
-						'lehfg'
+						'block-rewind'
 					),
 					formatRetention( settings.snapshotTtlMs )
 				) }
@@ -239,15 +242,15 @@ const SidebarContent = () => {
 
 // Registers the Gutenberg sidebar and its toolbar menu item.
 export const registerHistorySidebar = () => {
-	registerPlugin( 'lehfg-sidebar', {
+	registerPlugin( 'block-rewind', {
 		render: () => (
 			<>
-				<PluginSidebarMoreMenuItem target="lehfg-sidebar">
-					{ __( 'Live Editing History', 'lehfg' ) }
+				<PluginSidebarMoreMenuItem target="block-rewind-sidebar">
+					{ __( 'Block Rewind', 'block-rewind' ) }
 				</PluginSidebarMoreMenuItem>
 				<PluginSidebar
-					name="lehfg-sidebar"
-					title={ __( 'Live Editing History', 'lehfg' ) }
+					name="block-rewind-sidebar"
+					title={ __( 'Block Rewind', 'block-rewind' ) }
 					icon="backup"
 				>
 					<SidebarContent />
