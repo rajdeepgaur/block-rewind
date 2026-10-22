@@ -348,17 +348,20 @@ test.describe( 'Storage', () => {
 		] );
 
 		await openSavedPost( { admin, editor, page } );
+		// Regular checkpoints prune; the page-exit save skips pruning to commit faster.
+		await page.clock.install();
 		const blockId = await editParagraph( { editor, page }, ' 1' );
 
 		for ( let edit = 2; edit <= 6; edit += 1 ) {
 			await page.keyboard.type( ` ${ edit }` );
 			await page.waitForTimeout( 300 );
-			await flushHistory( page );
+			await page.clock.fastForward( 61 * 1000 );
 			await expect
 				.poll(
 					async () =>
 						( await readSnapshotContents( page, blockId ) ).pop()
-							?.content
+							?.content,
+					{ timeout: 10000 }
 				)
 				.toBe(
 					`Hello 1${ ' 2 3 4 5 6'.slice( 0, ( edit - 1 ) * 2 ) }`

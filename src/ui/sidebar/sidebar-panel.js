@@ -192,7 +192,10 @@ const SidebarContent = () => {
 	if ( snapshots.length === 0 ) {
 		return (
 			<EmptyState>
-				{ __( 'No history available for this block.', 'block-rewind' ) }
+				{ __(
+					'No versions saved yet. Versions are saved about once a minute while you edit.',
+					'block-rewind'
+				) }
 			</EmptyState>
 		);
 	}

@@ -12,9 +12,14 @@ import {
 } from '../identity/resolve-block-identities';
 import { computeBlockHash } from '../serialization/serialize-block';
 import { getAllEditorBlocks } from '../selectors/block-tree';
-import { persistSnapshotIfChanged } from '../snapshots/snapshot-service';
+import { matchOrphanedHistories } from '../identity/match-orphaned-histories';
+import {
+	listSnapshotsForPost,
+	persistSnapshotIfChanged,
+} from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 import { generateId } from '../utils/generate-id';
+import { isEmptyBlock } from '../utils/is-empty-block';
 
 const areMapsEqual = ( left, right ) =>
 	left.size === right.size &&
@@ -64,9 +69,16 @@ const captureSelectionBaseline = () => {
  *
  * Blocks get an ID only on their first edit after being selected, so selecting a
  * block never changes the post. The pre-edit state of each tracked block is saved
- * once per session as its baseline snapshot.
+ * once per session as its baseline snapshot, unless that state was empty (e.g. a
+ * block that was just inserted).
+ *
+ * @param {Object}  options                  Options.
+ * @param {boolean} options.persistBaselines Save new baselines in the background. The
+ *                                           page-exit save turns this off and writes
+ *                                           them itself, synchronously.
+ * @return {{ baselines: Array<{blockId: string, block: Object}> }} New baselines.
  */
-export const scanEditorBlocks = () => {
+export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 	if ( runtimeState.scanTimerId !== null ) {
 		clearTimeout( runtimeState.scanTimerId );
 		runtimeState.scanTimerId = null;
@@ -119,7 +131,10 @@ export const scanEditorBlocks = () => {
 
 		if ( ! runtimeState.baselineCapturedIds.has( blockId ) ) {
 			runtimeState.baselineCapturedIds.add( blockId );
-			baselines.push( { blockId, block: observed } );
+
+			if ( ! isEmptyBlock( observed ) ) {
+				baselines.push( { blockId, block: observed } );
+			}
 		}
 
 		markBlockDirty( blockId );
@@ -156,10 +171,72 @@ export const scanEditorBlocks = () => {
 	}
 
 	const postId = select( 'core/editor' ).getCurrentPostId();
-	for ( const { blockId, block } of baselines ) {
-		persistSnapshotIfChanged( blockId, block, postId ).catch( logError );
+
+	if ( persistBaselines ) {
+		for ( const { blockId, block } of baselines ) {
+			persistSnapshotIfChanged( blockId, block, postId ).catch(
+				logError
+			);
+		}
 	}
+
+	if ( runtimeState.relinkStatus === 'pending' && postId && blocks.length ) {
+		runtimeState.relinkStatus = 'running';
+		relinkOrphanedHistories( postId )
+			.catch( logError )
+			.finally( () => {
+				runtimeState.relinkStatus = 'done';
+			} );
+	}
+
+	return { baselines };
 };
+
+/**
+ * Gives blocks that lost their history ID (the post was reloaded without saving) their
+ * ID back, by matching their content against orphaned histories of this post.
+ *
+ * Runs once, as soon as the post's blocks are loaded. Empty blocks are never matched.
+ *
+ * @param {number|string} postId Current post ID.
+ */
+async function relinkOrphanedHistories( postId ) {
+	const snapshots = await listSnapshotsForPost( postId );
+	if ( ! snapshots.length ) {
+		return;
+	}
+
+	const presentBlockIds = new Set( runtimeState.idByClientId.values() );
+	const untrackedBlocks = getAllEditorBlocks()
+		.filter(
+			( block ) =>
+				! runtimeState.idByClientId.has( block.clientId ) &&
+				! isEmptyBlock( block )
+		)
+		.map( ( block ) => ( {
+			clientId: block.clientId,
+			name: block.name,
+			hash: computeBlockHash( block ),
+		} ) );
+
+	const matches = matchOrphanedHistories(
+		untrackedBlocks,
+		snapshots,
+		presentBlockIds
+	);
+
+	if ( ! matches.size ) {
+		return;
+	}
+
+	for ( const [ clientId, blockId ] of matches ) {
+		claimBlockId( runtimeState.identity, clientId, blockId );
+		runtimeState.pendingBaselines.delete( clientId );
+	}
+
+	// Writes the IDs (without an undo level) and updates the sidebar.
+	scanEditorBlocks();
+}
 
 // Returns the editor block currently owning a history ID, using an up-to-date scan.
 export const getTrackedBlock = ( blockId ) => {

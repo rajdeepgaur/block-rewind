@@ -177,8 +177,12 @@ test.describe( 'Block identity', () => {
 		await admin.editPost( postId );
 
 		expect( await getBlockIds( page ) ).toEqual( [ blockId ] );
+		// Leaving the page saved the edit as well as the first snapshot.
 		await expect
 			.poll( () => readSnapshotContents( page, blockId ) )
-			.toEqual( [ { blockName: 'core/paragraph', content: 'Hello' } ] );
+			.toEqual( [
+				{ blockName: 'core/paragraph', content: 'Hello' },
+				{ blockName: 'core/paragraph', content: 'Hello world' },
+			] );
 	} );
 } );

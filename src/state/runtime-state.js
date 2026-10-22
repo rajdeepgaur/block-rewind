@@ -12,6 +12,8 @@ export const runtimeState = {
 	// clientId -> block state captured when an untracked block was selected.
 	pendingBaselines: new Map(),
 	previousSelectedClientId: null,
+	// 'pending' until orphaned histories were matched against the loaded post once.
+	relinkStatus: 'pending',
 	isRestoringSnapshot: false,
 	scanTimerId: null,
 	storeUnsubscribe: null,
