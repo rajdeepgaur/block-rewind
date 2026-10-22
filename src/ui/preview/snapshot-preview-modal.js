@@ -78,8 +78,19 @@ const humanizeAttributePath = ( path ) => {
 };
 
 const ChangeSummary = ( { diff } ) => {
-	if ( ! diff?.hasChanges ) {
+	if ( ! diff ) {
 		return null;
+	}
+
+	if ( ! diff.hasChanges ) {
+		return (
+			<div className="lehfg-preview-modal__summary">
+				{ __(
+					'This version is identical to the current block.',
+					'lehfg'
+				) }
+			</div>
+		);
 	}
 
 	const summaryItems = [];

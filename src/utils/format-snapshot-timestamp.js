@@ -2,6 +2,8 @@ const formatClockTime = ( date ) =>
 	new Intl.DateTimeFormat( undefined, {
 		hour: 'numeric',
 		minute: '2-digit',
+		// Several versions can be saved within one minute (first edit, checkpoint, restore).
+		second: '2-digit',
 		hour12: true,
 	} ).format( date );
 

@@ -74,3 +74,18 @@
 	margin-top: 0;
 	color: #757575;
 }
+
+.lehfg-sidebar__entry--current {
+	box-shadow: inset 3px 0 0 var(--wp-admin-theme-color, #3858e9);
+}
+
+.lehfg-sidebar__current-note {
+	margin: 0 0 12px;
+}
+
+.lehfg-sidebar__help {
+	margin: 0;
+	padding: 16px;
+	color: #757575;
+	font-size: 12px;
+}

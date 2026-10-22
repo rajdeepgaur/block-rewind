@@ -49,8 +49,21 @@ export const findSnapshotByHash = async ( postId, blockId, hash ) => {
 	return snapshots.find( ( snapshot ) => snapshot.hash === hash ) || null;
 };
 
-// Persists a block's state under a history ID unless it matches the latest snapshot.
-export const persistSnapshotIfChanged = ( blockId, block, postId ) =>
+/**
+ * Persists a block's state under a history ID unless it matches the latest snapshot.
+ *
+ * @param {string}        blockId  History ID of the block.
+ * @param {Object}        block    Editor block (or block-shaped object) to save.
+ * @param {number|string} postId   Current post ID.
+ * @param {Object}        metadata Extra fields stored on the record, e.g. `restoredFrom`.
+ * @return {Promise<boolean>} Whether a snapshot was written.
+ */
+export const persistSnapshotIfChanged = (
+	blockId,
+	block,
+	postId,
+	metadata = {}
+) =>
 	enqueueWrite( async () => {
 		if (
 			! postId ||
@@ -77,6 +90,7 @@ export const persistSnapshotIfChanged = ( blockId, block, postId ) =>
 			blockId,
 			postId,
 			...serializeBlockState( block ),
+			...metadata,
 			timestamp: now,
 			expiresAt: now + settings.snapshotTtlMs,
 			hash,

@@ -207,9 +207,14 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			return false;
 		}
 
-		// The restored content is already in history, so it is not recorded again.
 		claimBlockId( runtimeState.identity, restoredClientId, blockId );
 		runtimeState.observedByBlockId.set( blockId, restoredBlock );
+
+		// Record the restore as the newest version, so the history reads as a timeline
+		// even when several versions have identical content.
+		await persistSnapshotIfChanged( blockId, restoredBlock, postId, {
+			restoredFrom: snapshot.timestamp,
+		} );
 
 		showNotice( 'success', __( 'Version restored.', 'lehfg' ), {
 			actions: [

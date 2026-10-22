@@ -3,6 +3,7 @@ const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 const {
 	editParagraph,
 	getBlockIds,
+	openHistorySidebar,
 	openSavedPost,
 	readSnapshotContents,
 } = require( './utils' );
@@ -45,19 +46,12 @@ test.describe( 'Block identity', () => {
 			.poll( () => readSnapshotContents( page, blockId ) )
 			.toEqual( [ { blockName: 'core/paragraph', content: 'Hello' } ] );
 
-		await page.evaluate( () =>
-			window.wp.data
-				.dispatch( 'core/interface' )
-				.enableComplementaryArea(
-					'core',
-					'lehfg-sidebar/lehfg-sidebar'
-				)
-		);
-		await expect(
-			page
-				.getByRole( 'region', { name: 'Editor settings' } )
-				.getByRole( 'button', { name: /Today/ } )
-		).toHaveCount( 1 );
+		// The block was edited after its only version, so no version is current.
+		const sidebar = await openHistorySidebar( page );
+		const entries = sidebar.getByRole( 'button', { name: /Today/ } );
+		await expect( entries ).toHaveCount( 1 );
+		await expect( entries.first() ).toContainText( 'Edited since' );
+		await expect( entries.first() ).not.toContainText( 'Current' );
 	} );
 
 	test( 'duplicating a block keeps the ID on the original only', async ( {

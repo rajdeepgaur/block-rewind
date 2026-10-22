@@ -106,8 +106,12 @@ const editParagraph = async ( { editor, page }, text = ' world' ) => {
 	return ( await getBlockIds( page ) )[ 0 ];
 };
 
-// Simulates the tab being hidden, which saves pending edits immediately.
+// Simulates leaving the page, which saves every edited block immediately.
 const flushHistory = ( page ) =>
+	page.evaluate( () => window.dispatchEvent( new Event( 'pagehide' ) ) );
+
+// Simulates switching to another tab.
+const hideTab = ( page ) =>
 	page.evaluate( () => {
 		Object.defineProperty( document, 'visibilityState', {
 			configurable: true,
@@ -131,6 +135,7 @@ module.exports = {
 	flushHistory,
 	getBlockIds,
 	getFirstBlock,
+	hideTab,
 	openHistorySidebar,
 	openSavedPost,
 	putSnapshot,
