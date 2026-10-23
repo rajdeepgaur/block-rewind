@@ -133,11 +133,23 @@ const openHistorySidebar = async ( page ) => {
 	return page.getByRole( 'region', { name: 'Editor settings' } );
 };
 
+// The saved versions listed in the history sidebar, newest first.
+const getVersionRows = ( sidebar ) =>
+	sidebar.locator( '.block-rewind-timeline__version' );
+
+// Clicks Compare or Restore on a version row; the actions appear on hover.
+const clickVersionAction = async ( row, action ) => {
+	await row.hover();
+	await row.getByRole( 'button', { name: action, exact: true } ).click();
+};
+
 module.exports = {
+	clickVersionAction,
 	editParagraph,
 	flushHistory,
 	getBlockIds,
 	getFirstBlock,
+	getVersionRows,
 	hideTab,
 	openHistorySidebar,
 	openSavedPost,

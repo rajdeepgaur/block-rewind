@@ -3,6 +3,7 @@ const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 const {
 	editParagraph,
 	getBlockIds,
+	getVersionRows,
 	openHistorySidebar,
 	openSavedPost,
 	readSnapshotContents,
@@ -48,10 +49,13 @@ test.describe( 'Block identity', () => {
 
 		// The block was edited after its only version, so no version is current.
 		const sidebar = await openHistorySidebar( page );
-		const entries = sidebar.getByRole( 'button', { name: /Today/ } );
+		const entries = getVersionRows( sidebar );
 		await expect( entries ).toHaveCount( 1 );
-		await expect( entries.first() ).toContainText( 'Edited since' );
+		await expect( entries.first() ).toContainText( 'Before editing' );
 		await expect( entries.first() ).not.toContainText( 'Current' );
+		await expect(
+			sidebar.locator( '.block-rewind-timeline__now' )
+		).toContainText( 'Edited since the last version' );
 	} );
 
 	test( 'duplicating a block keeps the ID on the original only', async ( {

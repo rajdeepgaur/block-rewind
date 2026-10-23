@@ -1,4 +1,4 @@
-import { useEffect, useState } from '@wordpress/element';
+import { useCallback, useEffect, useState } from '@wordpress/element';
 
 import {
 	listSnapshotsForBlock,
@@ -6,6 +6,7 @@ import {
 } from '../../snapshots/snapshot-service';
 
 // Loads snapshots for a tracked block and reloads them when new ones are saved.
+// `reload` loads them again, e.g. after a failed read.
 export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 	const [ snapshots, setSnapshots ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( false );
@@ -72,5 +73,10 @@ export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 		};
 	}, [ blockRewindId, postId, revision ] );
 
-	return { snapshots, isLoading, error };
+	const reload = useCallback(
+		() => setRevision( ( value ) => value + 1 ),
+		[]
+	);
+
+	return { snapshots, isLoading, error, reload };
 };

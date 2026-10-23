@@ -1,10 +1,12 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
 const {
+	clickVersionAction,
 	editParagraph,
 	flushHistory,
 	getBlockIds,
 	getFirstBlock,
+	getVersionRows,
 	hideTab,
 	openHistorySidebar,
 	openSavedPost,
@@ -13,13 +15,12 @@ const {
 	readSnapshots,
 } = require( './utils' );
 
-// Waits for the expected number of history entries, then expands the oldest one
-// and clicks one of its actions. The newest entry is the current version.
+// Waits for the expected number of versions, then clicks one of the actions of
+// the oldest. The newest version is listed first.
 const clickOldestEntryAction = async ( sidebar, entryCount, action ) => {
-	const entries = sidebar.getByRole( 'button', { name: /Today/ } );
+	const entries = getVersionRows( sidebar );
 	await expect( entries ).toHaveCount( entryCount );
-	await entries.last().click();
-	await sidebar.getByRole( 'button', { name: action, exact: true } ).click();
+	await clickVersionAction( entries.last(), action );
 };
 
 test.describe( 'Restore', () => {
@@ -89,31 +90,30 @@ test.describe( 'Restore', () => {
 			.toEqual( [ 'Hello', 'Hello world', 'Hello' ] );
 
 		const sidebar = await openHistorySidebar( page );
-		const entries = sidebar.getByRole( 'button', { name: /Today/ } );
-		const currentEntries = sidebar.getByRole( 'button', {
-			name: /Current/,
-		} );
+		const entries = getVersionRows( sidebar );
+		const currentEntries = sidebar.locator(
+			'.block-rewind-timeline__version.is-current'
+		);
+		const nowRow = sidebar.locator( '.block-rewind-timeline__now' );
 
 		// Only the newest of the two identical versions is current.
 		await expect( entries ).toHaveCount( 3 );
 		await expect( currentEntries ).toHaveCount( 1 );
 		await expect( entries.first() ).toContainText( 'Current' );
+		await expect( nowRow ).toHaveCount( 0 );
 
-		// After a new edit no version is current; the latest says the block changed since.
+		// After a new edit no version is current; a "Now" row says the block changed since.
 		await editor.canvas
 			.getByRole( 'document', { name: 'Block: Paragraph' } )
 			.click();
 		await page.keyboard.press( 'End' );
 		await page.keyboard.type( ' again' );
-		await expect( entries.first() ).toContainText( 'Edited since' );
+		await expect( nowRow ).toContainText( 'Edited since the last version' );
 		await expect( currentEntries ).toHaveCount( 0 );
 		await expect( entries ).toHaveCount( 3 );
 
 		// Restore the older of the two identical versions.
-		await entries.last().click();
-		await sidebar
-			.getByRole( 'button', { name: 'Restore', exact: true } )
-			.click();
+		await clickVersionAction( entries.last(), 'Restore' );
 
 		await expect
 			.poll( async () => ( await getFirstBlock( page ) ).content )
@@ -139,6 +139,7 @@ test.describe( 'Restore', () => {
 		await expect( currentEntries ).toHaveCount( 1 );
 		await expect( entries.first() ).toContainText( 'Restored' );
 		await expect( entries.first() ).toContainText( 'Current' );
+		await expect( nowRow ).toHaveCount( 0 );
 	} );
 
 	test( 'restores a version of another block type', async ( {
@@ -220,7 +221,7 @@ test.describe( 'Restore', () => {
 		expect( ( await getFirstBlock( page ) ).content ).toBe( 'Hello world' );
 	} );
 
-	test( 'restores from the preview modal', async ( {
+	test( 'restores from the compare modal', async ( {
 		admin,
 		editor,
 		page,
@@ -232,10 +233,14 @@ test.describe( 'Restore', () => {
 			.toHaveLength( 1 );
 
 		const sidebar = await openHistorySidebar( page );
-		await clickOldestEntryAction( sidebar, 1, 'Preview' );
+		await clickOldestEntryAction( sidebar, 1, 'Compare' );
 
-		const modal = page.getByRole( 'dialog', { name: 'Snapshot Preview' } );
-		await expect( modal.getByText( 'Changed:' ) ).toBeVisible();
+		const modal = page.getByRole( 'dialog', {
+			name: 'Version from before editing',
+		} );
+		await expect(
+			modal.getByRole( 'row', { name: /^Text 2 words 1 word/ } )
+		).toBeVisible();
 		await modal
 			.getByRole( 'button', { name: 'Restore this version' } )
 			.click();
@@ -391,7 +396,7 @@ test.describe( 'Storage', () => {
 		await openSavedPost( { admin, editor, page } );
 		const sidebar = await openHistorySidebar( page );
 		await expect(
-			sidebar.getByText( /Block history is unavailable/ )
+			sidebar.getByText( 'Block history is off in this browser' )
 		).toBeVisible();
 
 		await editor.canvas
