@@ -3,6 +3,7 @@ import { dispatch, select } from '@wordpress/data';
 import { __, sprintf } from '@wordpress/i18n';
 
 import { BLOCK_ID_ATTRIBUTE } from '../constants';
+import { clearDirtyBlock } from '../change-detection/dirty-registry';
 import { getTrackedBlock } from '../change-detection/subscribe-store';
 import { claimBlockId } from '../identity/resolve-block-identities';
 import { computeBlockHash } from '../serialization/serialize-block';
@@ -32,15 +33,101 @@ const findMissingBlockTypes = ( node, missing = new Set() ) => {
 	return missing;
 };
 
-// Rebuilds nested block instances from serialized snapshot inner blocks.
-const rehydrateInnerBlocks = ( serializedInnerBlocks = [] ) =>
-	serializedInnerBlocks.map( ( serializedBlock ) =>
-		createBlock(
+// History IDs of the tracked blocks inside a block, by position, e.g. "0.2".
+const getTrackedInnerBlocksByPath = (
+	innerBlocks,
+	prefix = '',
+	tracked = new Map()
+) => {
+	innerBlocks.forEach( ( block, index ) => {
+		const path = `${ prefix }${ index }`;
+		const blockId = runtimeState.idByClientId.get( block.clientId );
+
+		if ( blockId ) {
+			tracked.set( path, { blockId, name: block.name } );
+		}
+		getTrackedInnerBlocksByPath( block.innerBlocks, `${ path }.`, tracked );
+	} );
+
+	return tracked;
+};
+
+// Collects the history IDs stored on serialized inner blocks.
+const collectStoredIds = ( serializedInnerBlocks = [], ids = new Set() ) => {
+	serializedInnerBlocks.forEach( ( serializedBlock ) => {
+		const blockId = serializedBlock.attributes?.[ BLOCK_ID_ATTRIBUTE ];
+		if ( blockId ) {
+			ids.add( blockId );
+		}
+		collectStoredIds( serializedBlock.innerBlocks, ids );
+	} );
+
+	return ids;
+};
+
+/**
+ * Rebuilds nested block instances from serialized snapshot inner blocks.
+ *
+ * An inner block saved before it had a history ID gets the ID of the tracked block
+ * now at the same position, if it is the same block type, so restoring a parent
+ * keeps the blocks inside connected to their own history.
+ *
+ * @param {Object[]}    serializedInnerBlocks Inner blocks of a snapshot.
+ * @param {Map}         trackedByPath         From getTrackedInnerBlocksByPath().
+ * @param {Set<string>} usedIds               IDs already present in the restored tree.
+ * @param {string}      prefix                Position path of the parent.
+ * @return {Object[]} Blocks.
+ */
+const rehydrateInnerBlocks = (
+	serializedInnerBlocks = [],
+	trackedByPath = new Map(),
+	usedIds = new Set(),
+	prefix = ''
+) =>
+	serializedInnerBlocks.map( ( serializedBlock, index ) => {
+		const path = `${ prefix }${ index }`;
+		const attributes = { ...( serializedBlock.attributes || {} ) };
+		const tracked = trackedByPath.get( path );
+
+		if (
+			! attributes[ BLOCK_ID_ATTRIBUTE ] &&
+			tracked?.name === serializedBlock.blockName &&
+			! usedIds.has( tracked.blockId )
+		) {
+			attributes[ BLOCK_ID_ATTRIBUTE ] = tracked.blockId;
+			usedIds.add( tracked.blockId );
+		}
+
+		return createBlock(
 			serializedBlock.blockName,
-			serializedBlock.attributes || {},
-			rehydrateInnerBlocks( serializedBlock.innerBlocks || [] )
-		)
-	);
+			attributes,
+			rehydrateInnerBlocks(
+				serializedBlock.innerBlocks || [],
+				trackedByPath,
+				usedIds,
+				`${ path }.`
+			)
+		);
+	} );
+
+// Tracked blocks inside a block, as history ID -> editor block. Uses the latest scan.
+const getTrackedDescendants = ( clientId ) => {
+	const descendants = new Map();
+	const descendantClientIds = select(
+		'core/block-editor'
+	).getClientIdsOfDescendants( [ clientId ] );
+
+	for ( const descendantClientId of descendantClientIds ) {
+		const blockId = runtimeState.idByClientId.get( descendantClientId );
+		const block = blockId && runtimeState.blockByBlockId.get( blockId );
+
+		if ( block ) {
+			descendants.set( blockId, block );
+		}
+	}
+
+	return descendants;
+};
 
 // Attributes that turn the current block's attributes into exactly the restored ones.
 const getAttributeUpdate = ( currentAttributes, restoredAttributes ) => {
@@ -113,6 +200,8 @@ const restoreAsOtherBlockType = ( targetBlock, restoredBlock ) => {
  * Replaces the current content of a tracked block with a stored snapshot.
  *
  * The current state is saved to history first, and the restore is a single undo step.
+ * Tracked blocks inside are saved first too, so each can be brought back on its own;
+ * those the restore changes get a version marked as changed by this restore.
  *
  * @param {Object} snapshot Snapshot record from IndexedDB.
  * @return {Promise<boolean>} Whether the block was restored.
@@ -182,13 +271,26 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			return false;
 		}
 
+		const hashesBefore = new Map();
+		for ( const [ innerBlockId, innerBlock ] of getTrackedDescendants(
+			latestTargetBlock.clientId
+		) ) {
+			hashesBefore.set( innerBlockId, computeBlockHash( innerBlock ) );
+			clearDirtyBlock( innerBlockId );
+			await persistSnapshotIfChanged( innerBlockId, innerBlock, postId );
+		}
+
 		const restoredBlock = createBlock(
 			snapshot.blockName,
 			{
 				...( snapshot.attributes || {} ),
 				[ BLOCK_ID_ATTRIBUTE ]: blockId,
 			},
-			rehydrateInnerBlocks( snapshot.innerBlocks || [] )
+			rehydrateInnerBlocks(
+				snapshot.innerBlocks || [],
+				getTrackedInnerBlocksByPath( latestTargetBlock.innerBlocks ),
+				collectStoredIds( snapshot.innerBlocks )
+			)
 		);
 
 		const restoredClientId =
@@ -215,6 +317,34 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 		await persistSnapshotIfChanged( blockId, restoredBlock, postId, {
 			restoredFrom: snapshot.timestamp,
 		} );
+
+		// The scan in getTrackedBlock() picks up the restored inner blocks, which keep
+		// their history IDs. Their new state is saved now, marked as caused by this
+		// restore, instead of later as an ordinary edit.
+		getTrackedBlock( blockId );
+		const restoredWithParent = {
+			blockId,
+			blockName: snapshot.blockName,
+			timestamp: snapshot.timestamp,
+		};
+		for ( const [ innerBlockId, innerBlock ] of getTrackedDescendants(
+			restoredClientId
+		) ) {
+			if (
+				computeBlockHash( innerBlock ) !==
+				hashesBefore.get( innerBlockId )
+			) {
+				clearDirtyBlock( innerBlockId );
+				await persistSnapshotIfChanged(
+					innerBlockId,
+					innerBlock,
+					postId,
+					{
+						restoredWithParent,
+					}
+				);
+			}
+		}
 
 		showNotice( 'success', __( 'Version restored.', 'block-rewind' ), {
 			actions: [

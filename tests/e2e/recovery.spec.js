@@ -1,10 +1,12 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
 const {
+	clickVersionAction,
 	editParagraph,
 	flushHistory,
 	getBlockIds,
 	getFirstBlock,
+	getVersionRows,
 	openHistorySidebar,
 	openSavedPost,
 	readSnapshotContents,
@@ -46,13 +48,10 @@ test.describe( 'Recovery after a reload', () => {
 			.getByRole( 'document', { name: 'Block: Paragraph' } )
 			.click();
 		const sidebar = await openHistorySidebar( page );
-		const entries = sidebar.getByRole( 'button', { name: /Today/ } );
+		const entries = getVersionRows( sidebar );
 		await expect( entries ).toHaveCount( 2 );
 		await expect( entries.last() ).toContainText( 'Current' );
-		await entries.first().click();
-		await sidebar
-			.getByRole( 'button', { name: 'Restore', exact: true } )
-			.click();
+		await clickVersionAction( entries.first(), 'Restore' );
 		await expect
 			.poll( async () => ( await getFirstBlock( page ) ).content )
 			.toBe( 'Hello world more' );
@@ -121,7 +120,7 @@ test.describe( 'Empty versions', () => {
 		expect( await contents() ).toEqual( [] );
 		const sidebar = await openHistorySidebar( page );
 		await expect(
-			sidebar.getByText( /No versions saved yet/ )
+			sidebar.getByText( /first version is saved within a minute/ )
 		).toBeVisible();
 
 		await flushHistory( page );

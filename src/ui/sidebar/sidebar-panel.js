@@ -1,10 +1,12 @@
-import { getBlockType } from '@wordpress/blocks';
-import { Button, Notice, PanelBody, Spinner } from '@wordpress/components';
+import { store as blockEditorStore } from '@wordpress/block-editor';
+import { Button, Notice } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useState, useSyncExternalStore } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
+
+import './styles.css';
 
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
 import { computeBlockHash } from '../../serialization/serialize-block';
@@ -13,17 +15,13 @@ import {
 	getStorageStatus,
 	subscribeToStorageStatus,
 } from '../../state/storage-status';
+import { CompareModal } from '../compare/compare-modal';
+import { useNow } from '../use-now';
+import { BlockHeader } from './block-header';
+import { NestedHistory } from './nested-history';
 import { useSelectedBlockHistory } from './use-selected-block-history';
 import { useTrackedBlockId } from './use-tracked-block-id';
-import { SnapshotPreviewModal } from '../preview/snapshot-preview-modal';
-import { formatSnapshotTimestamp } from '../../utils/format-snapshot-timestamp';
-
-const EmptyState = ( { children } ) => (
-	<div className="block-rewind-sidebar__empty">{ children }</div>
-);
-
-const getBlockTitle = ( blockName ) =>
-	getBlockType( blockName )?.title || blockName;
+import { VersionTimeline } from './version-timeline';
 
 // Describes retention in hours or minutes, e.g. "4 hours".
 const formatRetention = ( milliseconds ) => {
@@ -45,99 +43,86 @@ const formatRetention = ( milliseconds ) => {
 	);
 };
 
-// Renders one saved version with its preview and restore actions.
-const SnapshotItem = ( {
-	snapshot,
-	isCurrent,
-	isEditedSince,
-	onPreview,
-	onRestore,
-} ) => {
-	const isRestore = Boolean( snapshot.restoredFrom );
-	const title = [
-		formatSnapshotTimestamp( snapshot.timestamp ),
-		isRestore && __( 'Restored', 'block-rewind' ),
-		isCurrent && __( 'Current', 'block-rewind' ),
-		isEditedSince && __( 'Edited since', 'block-rewind' ),
-	]
-		.filter( Boolean )
-		.join( ' · ' );
+const HistoryIcon = () => (
+	<svg
+		width="32"
+		height="32"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		strokeWidth="1.4"
+		aria-hidden="true"
+		focusable="false"
+	>
+		<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+		<path d="M3.5 3.5V8H8" />
+		<path d="M12 7.5V12l3 2" />
+	</svg>
+);
 
-	return (
-		<PanelBody
-			title={ title }
-			className={
-				isCurrent ? 'block-rewind-sidebar__entry--current' : undefined
-			}
-			initialOpen={ false }
-		>
-			<p className="block-rewind-sidebar__block-type">
-				{ getBlockTitle( snapshot.blockName ) }
-			</p>
-			{ isRestore && (
-				<p className="block-rewind-sidebar__restored-from">
-					{ sprintf(
-						/* translators: %s: date and time of the restored version. */
-						__(
-							'Restored from the version of %s.',
-							'block-rewind'
-						),
-						formatSnapshotTimestamp( snapshot.restoredFrom )
-					) }
-				</p>
-			) }
-			{ isEditedSince && (
-				<p className="block-rewind-sidebar__current-note">
-					{ __(
-						'The block has been edited since this version was saved.',
-						'block-rewind'
-					) }
-				</p>
-			) }
-			{ isCurrent ? (
-				<p className="block-rewind-sidebar__current-note">
-					{ __( 'This is how the block looks now.', 'block-rewind' ) }
-				</p>
-			) : (
-				<div className="block-rewind-sidebar__actions">
-					<Button variant="secondary" onClick={ onPreview }>
-						{ __( 'Preview', 'block-rewind' ) }
-					</Button>
-					<Button variant="secondary" onClick={ onRestore }>
-						{ __( 'Restore', 'block-rewind' ) }
-					</Button>
-				</div>
-			) }
-		</PanelBody>
+const EmptyState = ( { icon, title, children } ) => (
+	<div className="block-rewind-empty">
+		{ icon }
+		<p className="block-rewind-empty__title">{ title }</p>
+		{ children && <p className="block-rewind-empty__text">{ children }</p> }
+	</div>
+);
+
+const LoadingState = () => (
+	<div className="block-rewind-loading" aria-hidden="true">
+		{ [ 1, 2, 3, 4 ].map( ( key ) => (
+			<div key={ key } className="block-rewind-loading__row">
+				<span className="block-rewind-loading__dot" />
+				<span className="block-rewind-loading__lines">
+					<span />
+					<span />
+					<span />
+				</span>
+			</div>
+		) ) }
+	</div>
+);
+
+const describeVersionCount = ( count ) =>
+	sprintf(
+		/* translators: 1: number of versions, e.g. "4 versions". 2: retention period, e.g. "4 hours". */
+		__( '%1$s · kept in this browser for %2$s', 'block-rewind' ),
+		count
+			? sprintf(
+					/* translators: %d: number of versions. */
+					_n( '%d version', '%d versions', count, 'block-rewind' ),
+					count
+			  )
+			: __( 'No versions yet', 'block-rewind' ),
+		formatRetention( settings.snapshotTtlMs )
 	);
-};
 
-// Renders the sidebar contents for the selected block history.
+// Renders the history of the selected block, or explains why there is none.
 const SidebarContent = () => {
 	const storageStatus = useSyncExternalStore(
 		subscribeToStorageStatus,
 		getStorageStatus
 	);
-	const selectedBlock = useSelect(
-		( select ) => select( 'core/block-editor' ).getSelectedBlock(),
-		[]
-	);
-	const postId = useSelect(
-		( select ) => select( 'core/editor' ).getCurrentPostId(),
-		[]
-	);
+	const { selectedBlock, selectedCount, postId } = useSelect( ( select ) => {
+		const blockEditor = select( blockEditorStore );
+		return {
+			selectedBlock: blockEditor.getSelectedBlock(),
+			selectedCount: blockEditor.getSelectedBlockClientIds().length,
+			postId: select( 'core/editor' ).getCurrentPostId(),
+		};
+	}, [] );
 	const blockId = useTrackedBlockId( selectedBlock );
-	const { snapshots, isLoading, error } = useSelectedBlockHistory(
+	const { snapshots, isLoading, error, reload } = useSelectedBlockHistory(
 		blockId,
 		postId
 	);
-	const [ activePreviewSnapshot, setActivePreviewSnapshot ] =
-		useState( null );
+	const now = useNow();
+	const [ comparedSnapshot, setComparedSnapshot ] = useState( null );
 
-	const closePreviewModal = () => setActivePreviewSnapshot( null );
+	const closeCompare = () => setComparedSnapshot( null );
 
-	const handleRestoreFromPreview = ( snapshot ) => {
-		closePreviewModal();
+	const restoreFromCompare = ( snapshot ) => {
+		closeCompare();
 		// Let the modal unmount before the block changes.
 		window.setTimeout( () => {
 			restoreSnapshotToEditor( snapshot );
@@ -146,99 +131,153 @@ const SidebarContent = () => {
 
 	if ( storageStatus === 'unavailable' ) {
 		return (
-			<Notice status="warning" isDismissible={ false }>
-				{ __(
-					'Block history is unavailable because this browser does not allow the editor to store data (IndexedDB). This can happen in private browsing windows or when site data is blocked.',
-					'block-rewind'
+			<div className="block-rewind-sidebar__notice">
+				<Notice status="warning" isDismissible={ false }>
+					<p>
+						<strong>
+							{ __(
+								'Block history is off in this browser',
+								'block-rewind'
+							) }
+						</strong>
+					</p>
+					<p>
+						{ __(
+							'This browser doesn’t let the editor store data. That happens in private windows or when site data is blocked. Your post isn’t affected.',
+							'block-rewind'
+						) }
+					</p>
+				</Notice>
+			</div>
+		);
+	}
+
+	if ( selectedCount > 1 ) {
+		return (
+			<EmptyState title={ __( 'Select a single block', 'block-rewind' ) }>
+				{ sprintf(
+					/* translators: %d: number of selected blocks. */
+					_n(
+						'History is shown for one block at a time. You have %d block selected.',
+						'History is shown for one block at a time. You have %d blocks selected.',
+						selectedCount,
+						'block-rewind'
+					),
+					selectedCount
 				) }
-			</Notice>
+			</EmptyState>
 		);
 	}
 
 	if ( ! selectedBlock ) {
 		return (
-			<EmptyState>
-				{ __( 'Select a block to see its history.', 'block-rewind' ) }
+			<EmptyState
+				icon={ <HistoryIcon /> }
+				title={ __(
+					'Select a block to see its history',
+					'block-rewind'
+				) }
+			>
+				{ sprintf(
+					/* translators: %s: retention period, e.g. "4 hours". */
+					__(
+						'Each block keeps its own versions while you edit. They are saved in this browser for %s.',
+						'block-rewind'
+					),
+					formatRetention( settings.snapshotTtlMs )
+				) }
 			</EmptyState>
 		);
 	}
 
 	if ( ! blockId ) {
 		return (
-			<EmptyState>
-				{ __(
-					'No history yet. Edit this block to start recording its history.',
-					'block-rewind'
-				) }
-			</EmptyState>
+			<>
+				<BlockHeader
+					clientId={ selectedBlock.clientId }
+					details={ __( 'No versions yet', 'block-rewind' ) }
+				/>
+				<NestedHistory
+					clientId={ selectedBlock.clientId }
+					postId={ postId }
+				/>
+			</>
 		);
 	}
 
-	if ( isLoading && ! snapshots.length ) {
-		return <Spinner />;
-	}
-
-	if ( error ) {
-		return (
-			<EmptyState>
-				{ __(
-					'The history of this block could not be loaded.',
-					'block-rewind'
-				) }
-			</EmptyState>
-		);
-	}
-
-	if ( snapshots.length === 0 ) {
-		return (
-			<EmptyState>
-				{ __(
-					'No versions saved yet. Versions are saved about once a minute while you edit.',
-					'block-rewind'
-				) }
-			</EmptyState>
-		);
+	const isFirstLoad = isLoading && ! snapshots.length;
+	let details = describeVersionCount( snapshots.length );
+	if ( isFirstLoad ) {
+		details = __( 'Loading versions…', 'block-rewind' );
+	} else if ( error ) {
+		details = null;
 	}
 
 	// Snapshots are newest first, so this is the newest version matching the block;
 	// older versions with identical content are not marked. When the block was edited
-	// after its latest version, no version is current and the latest says so.
+	// after its latest version, no version is current and a "Now" row says so.
 	const currentHash = computeBlockHash( selectedBlock );
 	const currentIndex = snapshots.findIndex(
 		( snapshot ) => snapshot.hash === currentHash
 	);
 
+	let body;
+	if ( error ) {
+		body = (
+			<div className="block-rewind-empty">
+				<p className="block-rewind-empty__title">
+					{ __(
+						'Couldn’t load this block’s history',
+						'block-rewind'
+					) }
+				</p>
+				<p className="block-rewind-empty__text">
+					{ __(
+						'The browser’s storage didn’t respond. Your versions are still there. Try again, or reload the editor if this keeps happening.',
+						'block-rewind'
+					) }
+				</p>
+				<Button variant="secondary" size="compact" onClick={ reload }>
+					{ __( 'Try again', 'block-rewind' ) }
+				</Button>
+			</div>
+		);
+	} else if ( isFirstLoad ) {
+		body = <LoadingState />;
+	} else {
+		body = (
+			<VersionTimeline
+				snapshots={ snapshots }
+				currentIndex={ currentIndex }
+				now={ now }
+				onCompare={ setComparedSnapshot }
+				onRestore={ restoreSnapshotToEditor }
+			/>
+		);
+	}
+
 	return (
 		<>
-			<div className="block-rewind-sidebar__history">
-				{ snapshots.map( ( snapshot, index ) => (
-					<SnapshotItem
-						key={ snapshot.snapshotId }
-						snapshot={ snapshot }
-						isCurrent={ index === currentIndex }
-						isEditedSince={ currentIndex === -1 && index === 0 }
-						onPreview={ () => setActivePreviewSnapshot( snapshot ) }
-						onRestore={ () => restoreSnapshotToEditor( snapshot ) }
-					/>
-				) ) }
-			</div>
+			<BlockHeader
+				clientId={ selectedBlock.clientId }
+				details={ details }
+			/>
+			{ body }
 			<p className="block-rewind-sidebar__help">
-				{ sprintf(
-					/* translators: %s: retention period, e.g. "4 hours". */
-					__(
-						'Versions are saved automatically about once a minute while you edit, and kept in this browser for %s.',
-						'block-rewind'
-					),
-					formatRetention( settings.snapshotTtlMs )
+				{ __(
+					'Versions are saved about once a minute while you edit.',
+					'block-rewind'
 				) }
 			</p>
-			<SnapshotPreviewModal
-				isOpen={ Boolean( activePreviewSnapshot ) }
-				onRequestClose={ closePreviewModal }
-				onRestore={ handleRestoreFromPreview }
-				currentBlock={ selectedBlock }
-				snapshot={ activePreviewSnapshot }
-			/>
+			{ comparedSnapshot && (
+				<CompareModal
+					snapshot={ comparedSnapshot }
+					currentBlock={ selectedBlock }
+					now={ now }
+					onClose={ closeCompare }
+					onRestore={ restoreFromCompare }
+				/>
+			) }
 		</>
 	);
 };

@@ -1,0 +1,371 @@
+/* Compare modal. The header and footer stay in place; only the body scrolls. */
+
+@media (min-width: 782px) {
+
+	.block-rewind-compare.components-modal__frame {
+		width: min(1120px, calc(100vw - 80px));
+		max-width: none;
+		height: min(820px, calc(100vh - 80px));
+		max-height: none;
+	}
+}
+
+/* The header is laid out in the flow, so the content needs no room reserved
+   above it; the children fill the rest of the frame. */
+.block-rewind-compare .components-modal__content {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	margin-top: 0;
+	padding: 0;
+}
+
+.block-rewind-compare .components-modal__header {
+	position: static;
+	flex-shrink: 0;
+}
+
+.block-rewind-compare .components-modal__children-container {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.block-rewind-compare__body {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	padding: 0 24px 24px;
+}
+
+.block-rewind-compare__meta {
+	margin: 0 0 16px;
+	color: #646970;
+}
+
+.block-rewind-compare__identical {
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+}
+
+/* What restoring changes. */
+.block-rewind-change-table {
+	width: 100%;
+	margin: 0 0 20px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+.block-rewind-change-table th,
+.block-rewind-change-table td {
+	padding: 9px 16px;
+	border-bottom: 1px solid #f0f0f0;
+	text-align: left;
+	vertical-align: top;
+}
+
+.block-rewind-change-table thead th {
+	border-bottom: 1px solid #e0e0e0;
+	border-radius: 4px 4px 0 0;
+	background: #f6f7f7;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.block-rewind-change-table tbody th {
+	width: 28%;
+	color: #646970;
+	font-weight: 400;
+}
+
+.block-rewind-change-table tbody tr:last-child th,
+.block-rewind-change-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.block-rewind-change-table__value {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.block-rewind-change-table__after {
+	font-weight: 500;
+}
+
+.block-rewind-change-table__after .block-rewind-change-table__value {
+	margin-right: 8px;
+}
+
+.block-rewind-change-table__note {
+	margin-right: 8px;
+	color: #646970;
+	font-weight: 400;
+}
+
+.block-rewind-change-table__after .components-button.is-link {
+	font-weight: 400;
+}
+
+.block-rewind-change-table__swatch {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	border: 1px solid #949494;
+	border-radius: 2px;
+}
+
+/* View tabs, styled like the editor's tabs. */
+.block-rewind-compare__tabs {
+	display: flex;
+	margin-bottom: 16px;
+	border-bottom: 1px solid #e0e0e0;
+}
+
+.block-rewind-compare__tab {
+	height: 44px;
+	padding: 0 16px;
+	border: 0;
+	background: transparent;
+	color: #1e1e1e;
+	font-family: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.block-rewind-compare__tab[aria-selected="true"] {
+	box-shadow: inset 0 -3px 0 var(--wp-admin-theme-color, #3858e9);
+	font-weight: 500;
+}
+
+.block-rewind-compare__tab:focus-visible {
+	outline: 2px solid var(--wp-admin-theme-color, #3858e9);
+	outline-offset: -2px;
+}
+
+/* Side by side. */
+.block-rewind-compare__panes {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 24px;
+}
+
+.block-rewind-compare__pane {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+
+.block-rewind-compare__pane-title {
+	margin: 0;
+	color: #646970;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.block-rewind-preview {
+	min-height: 120px;
+	padding: 16px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	pointer-events: none;
+}
+
+.block-rewind-preview__unavailable {
+	margin: 0;
+	padding: 16px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	color: #646970;
+}
+
+/* Text changes. */
+.block-rewind-compare__text {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.block-rewind-text-diff {
+	max-width: 70ch;
+	padding: 20px 24px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	font-size: 16px;
+	line-height: 1.9;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.block-rewind-text-diff__removed,
+.block-rewind-text-diff__added {
+	padding: 1px 2px;
+	border-radius: 2px;
+	text-decoration-thickness: 1.5px;
+}
+
+.block-rewind-text-diff__removed {
+	background: #fbeaea;
+	color: #8a1c1c;
+	text-decoration-line: line-through;
+}
+
+.block-rewind-text-diff__added {
+	background: #e6f4ea;
+	color: #0a5c2b;
+	text-decoration-line: underline;
+	text-underline-offset: 4px;
+}
+
+.block-rewind-text-diff__gap.components-button {
+	height: 24px;
+	margin: 0 4px;
+	padding: 0 10px;
+	border: 1px dashed #949494;
+	border-radius: 12px;
+	background: #f6f7f7;
+	color: #1e1e1e;
+	font-size: 12px;
+	vertical-align: 2px;
+	white-space: nowrap;
+}
+
+.block-rewind-text-diff__legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin: 0;
+	padding: 0;
+	font-size: 12px;
+	list-style: none;
+}
+
+.block-rewind-text-diff__legend li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+}
+
+/* Nested blocks that change. */
+.block-rewind-nested-changes {
+	margin-top: 24px;
+}
+
+.block-rewind-nested-changes__title {
+	margin: 0 0 8px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.block-rewind-nested-changes__list {
+	margin: 0;
+	padding: 0;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	list-style: none;
+}
+
+.block-rewind-nested-changes__list li {
+	display: grid;
+	grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+	gap: 16px;
+	margin: 0;
+	padding: 12px 16px;
+	border-bottom: 1px solid #f0f0f0;
+}
+
+.block-rewind-nested-changes__list li:last-child {
+	border-bottom: 0;
+}
+
+.block-rewind-nested-changes__name {
+	font-weight: 500;
+}
+
+.block-rewind-nested-changes__detail {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.block-rewind-nested-changes__detail .block-rewind-text-diff {
+	padding: 0;
+	border: 0;
+	font-size: 14px;
+	line-height: 1.7;
+}
+
+.block-rewind-nested-changes__summary {
+	color: #646970;
+	font-size: 12px;
+}
+
+/* Footer: always visible below the body. */
+.block-rewind-compare__footer {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 12px;
+	padding: 16px 24px;
+	border-top: 1px solid #e0e0e0;
+	background: #fff;
+}
+
+.block-rewind-compare__footer-note {
+	flex: 1;
+	color: #646970;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.block-rewind-compare__footer-note p {
+	margin: 0;
+}
+
+.block-rewind-compare__footer-warning {
+	color: #1e1e1e;
+	font-weight: 500;
+}
+
+@media (max-width: 781px) {
+
+	.block-rewind-compare__body {
+		padding: 0 16px 16px;
+	}
+
+	.block-rewind-compare__footer {
+		flex-wrap: wrap;
+		padding: 12px 16px;
+	}
+
+	.block-rewind-compare__footer-note {
+		flex-basis: 100%;
+		order: 3;
+		text-align: center;
+	}
+
+	.block-rewind-compare__footer .components-button {
+		flex: 1;
+		justify-content: center;
+	}
+
+	.block-rewind-change-table th,
+	.block-rewind-change-table td {
+		padding: 8px 10px;
+	}
+
+	.block-rewind-nested-changes__list li {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 6px;
+	}
+}
