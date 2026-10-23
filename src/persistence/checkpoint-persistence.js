@@ -85,7 +85,10 @@ const saveAllBeforeUnload = () => {
 		const { baselines } = scanEditorBlocks( { persistBaselines: false } );
 		const dirtyBlockIds = getDirtyBlockIds();
 		const entries = [
-			...baselines,
+			...baselines.map( ( baseline ) => ( {
+				...baseline,
+				metadata: { isBaseline: true },
+			} ) ),
 			...dirtyBlockIds.map( ( blockId ) => ( {
 				blockId,
 				block: runtimeState.blockByBlockId.get( blockId ),

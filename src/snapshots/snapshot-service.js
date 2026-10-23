@@ -142,8 +142,10 @@ export const persistSnapshotIfChanged = (
  * stored in the given order, one millisecond apart, so a baseline stays older than
  * the edit that follows it.
  *
- * @param {Array<{blockId: string, block: Object}>} entries Blocks to save.
- * @param {number|string}                           postId  Current post ID.
+ * @param {Array<{blockId: string, block: Object, metadata?: Object}>} entries Blocks to save,
+ *                                                                             with optional
+ *                                                                             extra fields.
+ * @param {number|string}                                              postId  Current post ID.
  * @return {boolean} Whether the write was started (true when nothing needed saving).
  */
 export const persistSnapshotsNow = ( entries, postId ) => {
@@ -155,7 +157,7 @@ export const persistSnapshotsNow = ( entries, postId ) => {
 	const snapshots = [];
 	const latestHashes = new Map();
 
-	entries.forEach( ( { blockId, block } ) => {
+	entries.forEach( ( { blockId, block, metadata = {} } ) => {
 		if ( ! block ) {
 			return;
 		}
@@ -164,7 +166,7 @@ export const persistSnapshotsNow = ( entries, postId ) => {
 			blockId,
 			block,
 			postId,
-			{},
+			metadata,
 			now + snapshots.length
 		);
 		const previousHash = latestHashes.has( blockId )

@@ -174,9 +174,9 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 
 	if ( persistBaselines ) {
 		for ( const { blockId, block } of baselines ) {
-			persistSnapshotIfChanged( blockId, block, postId ).catch(
-				logError
-			);
+			persistSnapshotIfChanged( blockId, block, postId, {
+				isBaseline: true,
+			} ).catch( logError );
 		}
 	}
 
