@@ -74,6 +74,26 @@ const readSnapshotContents = async ( page, blockId ) =>
 const putSnapshot = ( page, snapshot ) =>
 	withHistoryStore( page, 'readwrite', 'store.put( arg );', snapshot );
 
+// Writes expired snapshots of another post, built in the page to keep the transfer small.
+const seedExpiredSnapshots = ( page, count, content ) =>
+	withHistoryStore(
+		page,
+		'readwrite',
+		`for ( let index = 0; index < arg.count; index += 1 ) {
+			store.put( {
+				snapshotId: 'expired-' + index,
+				postId: 0,
+				blockId: 'expired',
+				blockName: 'core/paragraph',
+				attributes: { content: arg.content },
+				innerBlocks: [],
+				timestamp: 1,
+				expiresAt: 1,
+			} );
+		}`,
+		{ count, content }
+	);
+
 // Creates and saves a post with one paragraph, then reloads it so the editor starts clean.
 const openSavedPost = async ( { admin, editor, page } ) => {
 	await admin.createNewPost();
@@ -156,5 +176,6 @@ module.exports = {
 	putSnapshot,
 	readSnapshotContents,
 	readSnapshots,
+	seedExpiredSnapshots,
 	selectParagraph,
 };

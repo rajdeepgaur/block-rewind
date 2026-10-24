@@ -33,13 +33,15 @@ export const initializeHistoryRuntime = async () => {
 
 	setStorageStatus( 'ready' );
 
-	await runSnapshotExpiryCleanup().catch( ( error ) => {
-		// eslint-disable-next-line no-console
-		console.error( 'Block Rewind cleanup error:', error );
-	} );
-
 	startStoreSubscription();
 	startCheckpointPersistence();
 	startExpiryCleanupScheduler();
 	startFlushOnPageHide();
+
+	// Runs in the background: after a long absence there can be enough expired versions
+	// to take seconds, and edits made meanwhile must already be tracked.
+	runSnapshotExpiryCleanup().catch( ( error ) => {
+		// eslint-disable-next-line no-console
+		console.error( 'Block Rewind cleanup error:', error );
+	} );
 };

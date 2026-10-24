@@ -65,9 +65,13 @@ export const subscribeToSnapshotChanges = ( listener ) => {
 	return () => changeListeners.delete( listener );
 };
 
-// Fetches all snapshots of a post and remembers each block's latest saved version.
+// Fetches all unexpired snapshots of a post and remembers each block's latest saved
+// version. Expired ones may still be stored while the start-up cleanup runs.
 export const listSnapshotsForPost = async ( postId ) => {
-	const snapshots = await getSnapshotsByPost( postId );
+	const now = Date.now();
+	const snapshots = ( await getSnapshotsByPost( postId ) ).filter(
+		( snapshot ) => snapshot.expiresAt > now
+	);
 	snapshots.forEach( recordLastSaved );
 	return snapshots;
 };
@@ -89,6 +93,10 @@ export const findSnapshotByHash = async ( postId, blockId, hash ) => {
 /**
  * Persists a block's state under a history ID unless it matches the latest snapshot.
  *
+ * The version is timed when the save is requested, not when the queued write runs, so
+ * a write that waited (e.g. behind expiry cleanup) never ends up newer than the
+ * page-exit save of a later edit.
+ *
  * @param {string}        blockId  History ID of the block.
  * @param {Object}        block    Editor block (or block-shaped object) to save.
  * @param {number|string} postId   Current post ID.
@@ -100,8 +108,10 @@ export const persistSnapshotIfChanged = (
 	block,
 	postId,
 	metadata = {}
-) =>
-	enqueueWrite( async () => {
+) => {
+	const timestamp = Date.now();
+
+	return enqueueWrite( async () => {
 		if (
 			! postId ||
 			! blockId ||
@@ -126,7 +136,7 @@ export const persistSnapshotIfChanged = (
 			block,
 			postId,
 			metadata,
-			Date.now()
+			timestamp
 		);
 
 		await putSnapshot( snapshot, settings.maxSnapshotsPerBlock );
@@ -134,6 +144,7 @@ export const persistSnapshotIfChanged = (
 		notifySnapshotChange( snapshot );
 		return true;
 	} );
+};
 
 /**
  * Saves blocks immediately in one synchronous write, for when the page is unloading.
@@ -190,7 +201,16 @@ export const persistSnapshotsNow = ( entries, postId ) => {
 	return started;
 };
 
-// Removes expired snapshots using the current timestamp.
-export const runSnapshotExpiryCleanup = async () => {
-	await deleteExpiredSnapshots( Date.now() );
+let runningCleanup = null;
+
+// Removes expired snapshots using the current timestamp. A call made while a cleanup
+// is running shares it instead of starting another.
+export const runSnapshotExpiryCleanup = () => {
+	if ( ! runningCleanup ) {
+		runningCleanup = deleteExpiredSnapshots( Date.now() ).finally( () => {
+			runningCleanup = null;
+		} );
+	}
+
+	return runningCleanup;
 };

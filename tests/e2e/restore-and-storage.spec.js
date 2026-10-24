@@ -13,6 +13,7 @@ const {
 	putSnapshot,
 	readSnapshotContents,
 	readSnapshots,
+	seedExpiredSnapshots,
 } = require( './utils' );
 
 // Waits for the expected number of versions, then clicks one of the actions of
@@ -292,6 +293,32 @@ test.describe( 'Storage', () => {
 				{ blockName: 'core/paragraph', content: 'Hello' },
 				{ blockName: 'core/paragraph', content: 'Hello world' },
 			] );
+	} );
+
+	test( 'tracks edits made while expired versions are being removed', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		const postId = await openSavedPost( { admin, editor, page } );
+		await seedExpiredSnapshots( page, 20000, 'Expired '.repeat( 100 ) );
+
+		// The cleanup starts with the editor; edit before it can finish.
+		await admin.editPost( postId );
+		const blockId = await editParagraph( { editor, page } );
+		await flushHistory( page );
+
+		await expect
+			.poll( () => readSnapshotContents( page, blockId ) )
+			.toEqual( [
+				{ blockName: 'core/paragraph', content: 'Hello' },
+				{ blockName: 'core/paragraph', content: 'Hello world' },
+			] );
+		await expect
+			.poll(
+				async () => ( await readSnapshots( page, 'expired' ) ).length
+			)
+			.toBe( 0 );
 	} );
 
 	test( 'saves each edited block at most once a minute, including on tab switches', async ( {
