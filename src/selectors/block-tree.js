@@ -19,10 +19,30 @@ const flattenBlocks = ( blocks, collector = [] ) => {
 	return collector;
 };
 
-// Returns all blocks currently present in the editor canvas.
-export const getAllEditorBlocks = () => {
-	const blockEditorSelect = select( 'core/block-editor' );
-	const topLevelBlocks = blockEditorSelect.getBlocks() || [];
+// Returns the client ID of the block holding the post's blocks: '' (the root) when only
+// the post is shown, the Post Content block when the template is shown around it, or
+// null when the shown template has no Post Content block.
+const getPostRootClientId = () => {
+	const renderingMode = select( 'core/editor' ).getRenderingMode?.();
+	if ( ! renderingMode || renderingMode === 'post-only' ) {
+		return '';
+	}
 
-	return flattenBlocks( topLevelBlocks );
+	const [ postContentClientId ] =
+		select( 'core/block-editor' ).getBlocksByName( 'core/post-content' );
+	return postContentClientId || null;
+};
+
+// Returns all blocks of the post in the editor canvas. Blocks of the template around
+// the post are left out, so they are never tracked or re-linked.
+export const getAllEditorBlocks = () => {
+	const rootClientId = getPostRootClientId();
+	if ( rootClientId === null ) {
+		return [];
+	}
+
+	const blocks =
+		select( 'core/block-editor' ).getBlocks( rootClientId ) || [];
+
+	return flattenBlocks( blocks );
 };
