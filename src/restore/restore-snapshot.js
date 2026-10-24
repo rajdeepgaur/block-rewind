@@ -10,6 +10,7 @@ import { computeBlockHash } from '../serialization/serialize-block';
 import {
 	findSnapshotByHash,
 	persistSnapshotIfChanged,
+	persistSnapshotsNow,
 } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
 
@@ -266,18 +267,47 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			await persistSnapshotIfChanged( blockId, targetBlock, postId );
 		}
 
+		const savedTargetBlock = getTrackedBlock( blockId );
+		if ( ! savedTargetBlock ) {
+			return false;
+		}
+
+		const savedHashes = new Map( [ [ blockId, currentHash ] ] );
+		for ( const [ innerBlockId, innerBlock ] of getTrackedDescendants(
+			savedTargetBlock.clientId
+		) ) {
+			savedHashes.set( innerBlockId, computeBlockHash( innerBlock ) );
+			clearDirtyBlock( innerBlockId );
+			await persistSnapshotIfChanged( innerBlockId, innerBlock, postId );
+		}
+
+		// Edits made while the saves above were pending are saved too, synchronously, so
+		// nothing can change between this save and the restore.
 		const latestTargetBlock = getTrackedBlock( blockId );
 		if ( ! latestTargetBlock ) {
 			return false;
 		}
 
 		const hashesBefore = new Map();
-		for ( const [ innerBlockId, innerBlock ] of getTrackedDescendants(
-			latestTargetBlock.clientId
-		) ) {
-			hashesBefore.set( innerBlockId, computeBlockHash( innerBlock ) );
-			clearDirtyBlock( innerBlockId );
-			await persistSnapshotIfChanged( innerBlockId, innerBlock, postId );
+		const newerStates = [];
+		for ( const [ trackedId, trackedBlock ] of [
+			[ blockId, latestTargetBlock ],
+			...getTrackedDescendants( latestTargetBlock.clientId ),
+		] ) {
+			const hash = computeBlockHash( trackedBlock );
+			hashesBefore.set( trackedId, hash );
+
+			if ( hash !== savedHashes.get( trackedId ) ) {
+				clearDirtyBlock( trackedId );
+				newerStates.push( { blockId: trackedId, block: trackedBlock } );
+			}
+		}
+
+		if (
+			newerStates.length &&
+			! persistSnapshotsNow( newerStates, postId )
+		) {
+			throw new Error( 'Edits made during the restore were not saved.' );
 		}
 
 		const restoredBlock = createBlock(

@@ -14,6 +14,7 @@ const {
 	readSnapshotContents,
 	readSnapshots,
 	seedExpiredSnapshots,
+	selectParagraph,
 } = require( './utils' );
 
 // Waits for the expected number of versions, then clicks one of the actions of
@@ -23,6 +24,37 @@ const clickOldestEntryAction = async ( sidebar, entryCount, action ) => {
 	await expect( entries ).toHaveCount( entryCount );
 	await clickVersionAction( entries.last(), action );
 };
+
+// Keeps a write transaction open on the history store for a while, like a slow write,
+// so the plugin's own reads and writes wait. Resolves once it has started.
+const holdHistoryStore = ( page, durationMs ) =>
+	page.evaluate(
+		( duration ) =>
+			new Promise( ( resolve, reject ) => {
+				const request = window.indexedDB.open(
+					`block-rewind-history-${ window.blockRewindSettings.storageKey }`
+				);
+				request.onerror = () => reject( request.error );
+				request.onsuccess = () => {
+					const db = request.result;
+					const transaction = db.transaction(
+						'snapshots',
+						'readwrite'
+					);
+					const store = transaction.objectStore( 'snapshots' );
+					const deadline = Date.now() + duration;
+					const keepBusy = () => {
+						if ( Date.now() < deadline ) {
+							store.count().onsuccess = keepBusy;
+						}
+					};
+					keepBusy();
+					transaction.oncomplete = () => db.close();
+					resolve();
+				};
+			} ),
+		durationMs
+	);
 
 test.describe( 'Restore', () => {
 	test( 'restores an earlier version in place as a single undo step', async ( {
@@ -64,6 +96,40 @@ test.describe( 'Restore', () => {
 		await expect
 			.poll( async () => ( await getFirstBlock( page ) ).content )
 			.toBe( 'Hello world' );
+	} );
+
+	test( 'saves text typed while a restore waits for storage', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+		const blockId = await editParagraph( { editor, page } );
+		await flushHistory( page );
+		await expect
+			.poll( () => readSnapshots( page, blockId ) )
+			.toHaveLength( 2 );
+
+		const sidebar = await openHistorySidebar( page );
+		await holdHistoryStore( page, 1500 );
+		await clickOldestEntryAction( sidebar, 2, 'Restore' );
+		await selectParagraph( editor );
+		await page.keyboard.press( 'End' );
+		await page.keyboard.type( ' typed' );
+
+		await expect
+			.poll( async () => ( await getFirstBlock( page ) ).content, {
+				timeout: 10000,
+			} )
+			.toBe( 'Hello' );
+		await expect
+			.poll( () => readSnapshotContents( page, blockId ) )
+			.toEqual( [
+				{ blockName: 'core/paragraph', content: 'Hello' },
+				{ blockName: 'core/paragraph', content: 'Hello world' },
+				{ blockName: 'core/paragraph', content: 'Hello world typed' },
+				{ blockName: 'core/paragraph', content: 'Hello' },
+			] );
 	} );
 
 	test( 'marks one version as current and records which identical version was restored', async ( {

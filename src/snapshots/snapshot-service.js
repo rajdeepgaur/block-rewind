@@ -95,7 +95,8 @@ export const findSnapshotByHash = async ( postId, blockId, hash ) => {
  *
  * The version is timed when the save is requested, not when the queued write runs, so
  * a write that waited (e.g. behind expiry cleanup) never ends up newer than the
- * page-exit save of a later edit.
+ * page-exit save of a later edit. It is still always newer than the block's latest
+ * known version, even one saved in the same millisecond.
  *
  * @param {string}        blockId  History ID of the block.
  * @param {Object}        block    Editor block (or block-shaped object) to save.
@@ -109,7 +110,10 @@ export const persistSnapshotIfChanged = (
 	postId,
 	metadata = {}
 ) => {
-	const timestamp = Date.now();
+	const timestamp = Math.max(
+		Date.now(),
+		( getLastSaved( blockId )?.timestamp ?? -Infinity ) + 1
+	);
 
 	return enqueueWrite( async () => {
 		if (
