@@ -183,18 +183,26 @@ export const putSnapshot = ( snapshot, maxSnapshotsPerBlock ) =>
  * reliably than work queued behind promises. Nothing is pruned here, since extra steps
  * would delay the commit; the next regular write prunes the block.
  *
- * @param {Object[]} snapshots Snapshot records to store.
+ * @param {Object[]} snapshots            Snapshot records to store.
+ * @param {Object}   callbacks            Optional callbacks.
+ * @param {Function} callbacks.onComplete Called when the write commits.
+ * @param {Function} callbacks.onAbort    Called with the error when a started write fails.
  * @return {boolean} Whether the write was started.
  */
-export const putSnapshotsNow = ( snapshots ) => {
+export const putSnapshotsNow = ( snapshots, { onComplete, onAbort } = {} ) => {
 	if ( ! connectedDatabase || ! snapshots.length ) {
 		return false;
 	}
 
 	try {
-		const store = connectedDatabase
-			.transaction( SNAPSHOT_STORE, 'readwrite' )
-			.objectStore( SNAPSHOT_STORE );
+		const transaction = connectedDatabase.transaction(
+			SNAPSHOT_STORE,
+			'readwrite'
+		);
+		transaction.oncomplete = () => onComplete?.();
+		transaction.onabort = () => onAbort?.( transaction.error );
+
+		const store = transaction.objectStore( SNAPSHOT_STORE );
 		snapshots.forEach( ( snapshot ) => store.put( snapshot ) );
 		return true;
 	} catch ( error ) {

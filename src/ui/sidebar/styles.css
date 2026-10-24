@@ -216,6 +216,11 @@
 	min-width: 0;
 }
 
+/* Focused after a restore; the row's focus ring shows it. */
+.block-rewind-timeline__heading:focus {
+	outline: none;
+}
+
 .block-rewind-timeline__heading {
 	display: flex;
 	flex-wrap: wrap;

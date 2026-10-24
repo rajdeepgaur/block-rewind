@@ -1,6 +1,6 @@
 import { Button } from '@wordpress/components';
 import { useInstanceId } from '@wordpress/compose';
-import { useMemo, useState } from '@wordpress/element';
+import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
 import { describeChanges, getFullText } from '../../diff/describe-changes';
@@ -10,6 +10,7 @@ import {
 	getTimeGroupLabel,
 } from '../../utils/format-snapshot-timestamp';
 import { getBlockTitle, summarizeChanges } from '../change-labels';
+import { useStorageStatus } from '../use-storage-status';
 
 // Versions listed before "Show older versions".
 const INITIAL_VISIBLE_COUNT = 10;
@@ -22,36 +23,82 @@ const getExcerpt = ( snapshot ) => {
 		: text;
 };
 
+const getNowNote = ( hasVersions, storageStatus ) => {
+	if ( storageStatus === 'full' ) {
+		return __(
+			'Not saved to history yet: the browser’s storage is full.',
+			'block-rewind'
+		);
+	}
+
+	return hasVersions
+		? __(
+				'Edited since the last version. It is saved to history within a minute.',
+				'block-rewind'
+		  )
+		: __(
+				'This block’s first version is saved within a minute. Empty starting states are not kept.',
+				'block-rewind'
+		  );
+};
+
 // The current state of the block when it differs from every saved version.
-const NowRow = ( { hasVersions } ) => (
-	<div className="block-rewind-timeline__now">
-		<span
-			className="block-rewind-timeline__dot is-current"
-			aria-hidden="true"
-		/>
-		<div className="block-rewind-timeline__body">
-			<p className="block-rewind-timeline__title">
-				{ __( 'Now', 'block-rewind' ) }
-			</p>
-			<p className="block-rewind-timeline__note">
-				{ hasVersions
-					? __(
-							'Edited since the last version. It is saved to history within a minute.',
-							'block-rewind'
-					  )
-					: __(
-							'This block’s first version is saved within a minute. Empty starting states are not kept.',
-							'block-rewind'
-					  ) }
-			</p>
+const NowRow = ( { hasVersions } ) => {
+	const storageStatus = useStorageStatus();
+
+	return (
+		<div className="block-rewind-timeline__now">
+			<span
+				className="block-rewind-timeline__dot is-current"
+				aria-hidden="true"
+			/>
+			<div className="block-rewind-timeline__body">
+				<p className="block-rewind-timeline__title">
+					{ __( 'Now', 'block-rewind' ) }
+				</p>
+				<p className="block-rewind-timeline__note">
+					{ getNowNote( hasVersions, storageStatus ) }
+				</p>
+			</div>
 		</div>
-	</div>
-);
+	);
+};
+
+// Whether a row is the version recorded by the restore that requested focus.
+const isRequestedForFocus = ( version, focusRequest ) =>
+	Boolean(
+		focusRequest &&
+			version.isCurrent &&
+			version.snapshot.restoredFrom === focusRequest.restoredFrom &&
+			version.snapshot.timestamp >= focusRequest.savedAfter
+	);
 
 // One saved version, with Compare and Restore (shown on hover or keyboard focus).
-const VersionRow = ( { version, now, onCompare, onRestore } ) => {
+// The current version's heading can take focus, e.g. after a restore.
+const VersionRow = ( {
+	version,
+	now,
+	onCompare,
+	onRestore,
+	shouldFocus,
+	onFocusHandled,
+} ) => {
 	const titleId = useInstanceId( VersionRow, 'block-rewind-version-title' );
+	const headingRef = useRef();
 	const { snapshot, isCurrent, changeLabels, excerpt } = version;
+
+	// Takes focus only if it was lost, so typing in the canvas is never interrupted.
+	useEffect( () => {
+		if ( ! shouldFocus ) {
+			return;
+		}
+
+		const { activeElement, body } = headingRef.current.ownerDocument;
+		if ( ! activeElement || activeElement === body ) {
+			headingRef.current.focus();
+		}
+		onFocusHandled();
+	}, [ shouldFocus, onFocusHandled ] );
 	const { restoredWithParent } = snapshot;
 	const parentTitle =
 		restoredWithParent && getBlockTitle( restoredWithParent.blockName );
@@ -69,7 +116,11 @@ const VersionRow = ( { version, now, onCompare, onRestore } ) => {
 				aria-hidden="true"
 			/>
 			<div className="block-rewind-timeline__body">
-				<div className="block-rewind-timeline__heading">
+				<div
+					ref={ headingRef }
+					className="block-rewind-timeline__heading"
+					tabIndex={ isCurrent ? -1 : undefined }
+				>
 					<span
 						id={ titleId }
 						className="block-rewind-timeline__title"
@@ -177,11 +228,14 @@ const VersionRow = ( { version, now, onCompare, onRestore } ) => {
  * Lists a block's saved versions, newest first, grouped by time.
  *
  * @param {Object}   props
- * @param {Object[]} props.snapshots    Versions, newest first.
- * @param {number}   props.currentIndex Index of the version matching the block, or -1.
- * @param {number}   props.now          Current time in milliseconds.
- * @param {Function} props.onCompare    Called with a version to compare.
- * @param {Function} props.onRestore    Called with a version to restore.
+ * @param {Object[]} props.snapshots      Versions, newest first.
+ * @param {number}   props.currentIndex   Index of the version matching the block, or -1.
+ * @param {number}   props.now            Current time in milliseconds.
+ * @param {Function} props.onCompare      Called with a version to compare.
+ * @param {Function} props.onRestore      Called with a version to restore.
+ * @param {?Object}  props.focusRequest   `restoredFrom` and `savedAfter` of a version
+ *                                        recorded by a restore, to focus once listed.
+ * @param {Function} props.onFocusHandled Called once that version was listed.
  */
 export const VersionTimeline = ( {
 	snapshots,
@@ -189,6 +243,8 @@ export const VersionTimeline = ( {
 	now,
 	onCompare,
 	onRestore,
+	focusRequest,
+	onFocusHandled,
 } ) => {
 	const [ showAll, setShowAll ] = useState( false );
 
@@ -253,6 +309,11 @@ export const VersionTimeline = ( {
 								now={ now }
 								onCompare={ onCompare }
 								onRestore={ onRestore }
+								shouldFocus={ isRequestedForFocus(
+									version,
+									focusRequest
+								) }
+								onFocusHandled={ onFocusHandled }
 							/>
 						) ) }
 					</ol>

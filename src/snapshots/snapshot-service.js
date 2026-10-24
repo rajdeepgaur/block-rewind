@@ -11,7 +11,12 @@ import {
 	serializeBlockState,
 } from '../serialization/serialize-block';
 import { settings } from '../settings';
-import { getStorageStatus } from '../state/storage-status';
+import {
+	canWriteSnapshots,
+	getStorageStatus,
+	isQuotaExceededError,
+	setStorageStatus,
+} from '../state/storage-status';
 import { generateId } from '../utils/generate-id';
 
 const changeListeners = new Set();
@@ -26,6 +31,16 @@ const recordLastSaved = ( snapshot ) => {
 			hash: snapshot.hash,
 			timestamp: snapshot.timestamp,
 		} );
+	}
+};
+
+// Forgets a version whose write failed, if it is still the latest known one.
+const forgetLastSaved = ( snapshot ) => {
+	if (
+		lastSavedByBlockId.get( snapshot.blockId )?.timestamp ===
+		snapshot.timestamp
+	) {
+		lastSavedByBlockId.delete( snapshot.blockId );
 	}
 };
 
@@ -57,6 +72,40 @@ const notifySnapshotChange = ( snapshot ) => {
 	for ( const listener of changeListeners ) {
 		listener( snapshot );
 	}
+};
+
+/**
+ * Writes a snapshot, freeing space once when the browser's storage is full.
+ *
+ * On the first quota error, expired versions are removed and the write is tried
+ * again. If it still fails, storage is marked as full; later writes are tried as
+ * they are, and the first one that succeeds marks storage as ready again.
+ *
+ * @param {Object} snapshot Snapshot record.
+ */
+const writeSnapshot = async ( snapshot ) => {
+	try {
+		await putSnapshot( snapshot, settings.maxSnapshotsPerBlock );
+	} catch ( error ) {
+		if (
+			! isQuotaExceededError( error ) ||
+			getStorageStatus() === 'full'
+		) {
+			throw error;
+		}
+
+		try {
+			await runSnapshotExpiryCleanup();
+			await putSnapshot( snapshot, settings.maxSnapshotsPerBlock );
+		} catch ( retryError ) {
+			if ( isQuotaExceededError( retryError ) ) {
+				setStorageStatus( 'full' );
+			}
+			throw retryError;
+		}
+	}
+
+	setStorageStatus( 'ready' );
 };
 
 // Registers a listener called after a snapshot is written. Returns an unsubscribe function.
@@ -116,12 +165,7 @@ export const persistSnapshotIfChanged = (
 	);
 
 	return enqueueWrite( async () => {
-		if (
-			! postId ||
-			! blockId ||
-			! block ||
-			getStorageStatus() !== 'ready'
-		) {
+		if ( ! postId || ! blockId || ! block || ! canWriteSnapshots() ) {
 			return false;
 		}
 
@@ -143,7 +187,7 @@ export const persistSnapshotIfChanged = (
 			timestamp
 		);
 
-		await putSnapshot( snapshot, settings.maxSnapshotsPerBlock );
+		await writeSnapshot( snapshot );
 		recordLastSaved( snapshot );
 		notifySnapshotChange( snapshot );
 		return true;
@@ -157,14 +201,18 @@ export const persistSnapshotIfChanged = (
  * stored in the given order, one millisecond apart, so a baseline stays older than
  * the edit that follows it.
  *
- * @param {Array<{blockId: string, block: Object, metadata?: Object}>} entries Blocks to save,
- *                                                                             with optional
- *                                                                             extra fields.
- * @param {number|string}                                              postId  Current post ID.
+ * @param {Array<{blockId: string, block: Object, metadata?: Object}>} entries          Blocks to save,
+ *                                                                                      with optional
+ *                                                                                      extra fields.
+ * @param {number|string}                                              postId           Current post ID.
+ * @param {Object}                                                     options          Options.
+ * @param {Function}                                                   options.onFailed Called if the
+ *                                                                                      started write
+ *                                                                                      fails.
  * @return {boolean} Whether the write was started (true when nothing needed saving).
  */
-export const persistSnapshotsNow = ( entries, postId ) => {
-	if ( ! postId || getStorageStatus() !== 'ready' ) {
+export const persistSnapshotsNow = ( entries, postId, { onFailed } = {} ) => {
+	if ( ! postId || ! canWriteSnapshots() ) {
 		return false;
 	}
 
@@ -198,7 +246,16 @@ export const persistSnapshotsNow = ( entries, postId ) => {
 		return true;
 	}
 
-	const started = putSnapshotsNow( snapshots );
+	const started = putSnapshotsNow( snapshots, {
+		onComplete: () => setStorageStatus( 'ready' ),
+		onAbort: ( error ) => {
+			snapshots.forEach( forgetLastSaved );
+			if ( isQuotaExceededError( error ) ) {
+				setStorageStatus( 'full' );
+			}
+			onFailed?.( error );
+		},
+	} );
 	if ( started ) {
 		snapshots.forEach( recordLastSaved );
 	}

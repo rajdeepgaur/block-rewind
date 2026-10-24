@@ -132,6 +132,61 @@ test.describe( 'Restore', () => {
 			] );
 	} );
 
+	test( 'keeps keyboard focus on the restored version', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+		const blockId = await editParagraph( { editor, page } );
+		await flushHistory( page );
+		await expect
+			.poll( () => readSnapshots( page, blockId ) )
+			.toHaveLength( 2 );
+
+		const sidebar = await openHistorySidebar( page );
+		const entries = getVersionRows( sidebar );
+		await expect( entries ).toHaveCount( 2 );
+		const currentHeading = entries
+			.first()
+			.locator( '.block-rewind-timeline__heading' );
+
+		// From the sidebar: Tab from Compare to Restore, then Enter.
+		await entries
+			.last()
+			.getByRole( 'button', { name: 'Compare', exact: true } )
+			.focus();
+		await page.keyboard.press( 'Tab' );
+		await expect(
+			entries
+				.last()
+				.getByRole( 'button', { name: 'Restore', exact: true } )
+		).toBeFocused();
+		await page.keyboard.press( 'Enter' );
+
+		await expect( entries ).toHaveCount( 3 );
+		await expect( entries.first() ).toContainText( 'Current' );
+		await expect( entries.first() ).toContainText( 'Restored' );
+		await expect( currentHeading ).toBeFocused();
+
+		// From the compare modal of the "Hello world" version.
+		await entries
+			.nth( 1 )
+			.getByRole( 'button', { name: 'Compare', exact: true } )
+			.focus();
+		await page.keyboard.press( 'Enter' );
+		const restoreInModal = page
+			.getByRole( 'dialog' )
+			.getByRole( 'button', { name: 'Restore this version' } );
+		await restoreInModal.focus();
+		await page.keyboard.press( 'Enter' );
+
+		await expect( entries ).toHaveCount( 4 );
+		await expect( entries.first() ).toContainText( 'Current' );
+		await expect( currentHeading ).toBeFocused();
+		expect( ( await getFirstBlock( page ) ).content ).toBe( 'Hello world' );
+	} );
+
 	test( 'marks one version as current and records which identical version was restored', async ( {
 		admin,
 		editor,
@@ -473,6 +528,84 @@ test.describe( 'Storage', () => {
 		expect( snapshots[ 0 ].expiresAt - snapshots[ 0 ].timestamp ).toBe(
 			600 * 1000
 		);
+	} );
+
+	test( 'shows when storage is full and saves the block once there is space', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		// While the flag is set, every write aborts with a quota error once its requests
+		// are done, as a full storage does when the transaction commits.
+		await page.addInitScript( () => {
+			window.blockRewindE2eStorageFull = true;
+			const { put } = window.IDBObjectStore.prototype;
+			const errorGetter = Object.getOwnPropertyDescriptor(
+				window.IDBTransaction.prototype,
+				'error'
+			).get;
+
+			Object.defineProperty( window.IDBTransaction.prototype, 'error', {
+				get() {
+					return this.quotaError || errorGetter.call( this );
+				},
+			} );
+			window.IDBObjectStore.prototype.put = function ( ...args ) {
+				const request = put.apply( this, args );
+				if ( window.blockRewindE2eStorageFull ) {
+					const { transaction } = this;
+					transaction.quotaError = new DOMException(
+						'Quota exceeded',
+						'QuotaExceededError'
+					);
+					request.addEventListener( 'success', () => {
+						try {
+							transaction.abort();
+						} catch ( error ) {
+							// The transaction already finished.
+						}
+					} );
+				}
+				return request;
+			};
+		} );
+
+		await openSavedPost( { admin, editor, page } );
+		const blockId = await editParagraph( { editor, page } );
+
+		const snackbar = page.getByTestId( 'snackbar' );
+		await expect( snackbar ).toContainText(
+			'Block history isn’t being saved: the browser’s storage is full.'
+		);
+		await snackbar.getByRole( 'button', { name: 'View' } ).click();
+		const sidebar = page.getByRole( 'region', { name: 'Editor settings' } );
+		await expect(
+			sidebar.getByText( 'New versions can’t be saved' )
+		).toBeVisible();
+		await expect(
+			sidebar.locator( '.block-rewind-timeline__now' )
+		).toContainText( 'the browser’s storage is full' );
+
+		// A page-exit save that fails while the page stays open keeps both for later.
+		await flushHistory( page );
+		// Lets the aborted write report back.
+		await page.waitForTimeout( 300 );
+		expect( await readSnapshotContents( page, blockId ) ).toEqual( [] );
+
+		// Space is available again: the next save stores the pre-edit state and the edit.
+		await page.evaluate( () => {
+			window.blockRewindE2eStorageFull = false;
+		} );
+		await flushHistory( page );
+		await expect
+			.poll( () => readSnapshotContents( page, blockId ) )
+			.toEqual( [
+				{ blockName: 'core/paragraph', content: 'Hello' },
+				{ blockName: 'core/paragraph', content: 'Hello world' },
+			] );
+		await expect(
+			sidebar.getByText( 'New versions can’t be saved' )
+		).toBeHidden();
 	} );
 
 	test( 'shows a notice and tracks nothing when browser storage is unavailable', async ( {

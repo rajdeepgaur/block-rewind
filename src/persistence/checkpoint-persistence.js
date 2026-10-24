@@ -4,6 +4,7 @@ import { CHECKPOINT_INTERVAL_MS, CHECKPOINT_TICK_MS } from '../constants';
 import {
 	clearDirtyBlock,
 	getDirtyBlockIds,
+	markBlockDirty,
 } from '../change-detection/dirty-registry';
 import { scanEditorBlocks } from '../change-detection/subscribe-store';
 import {
@@ -13,10 +14,36 @@ import {
 	runSnapshotExpiryCleanup,
 } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
+import { isQuotaExceededError } from '../state/storage-status';
 
 const logError = ( error ) => {
 	// eslint-disable-next-line no-console
 	console.error( 'Block Rewind checkpoint error:', error );
+};
+
+// A full storage is shown in the sidebar instead of being logged on every attempt.
+const logWriteError = ( error ) => {
+	if ( ! isQuotaExceededError( error ) ) {
+		logError( error );
+	}
+};
+
+// Saves pre-edit states whose earlier save failed, before any later state of the block.
+const saveUnsavedBaselines = async ( postId ) => {
+	for ( const [ blockId, block ] of Array.from(
+		runtimeState.unsavedBaselines
+	) ) {
+		runtimeState.unsavedBaselines.delete( blockId );
+
+		try {
+			await persistSnapshotIfChanged( blockId, block, postId, {
+				isBaseline: true,
+			} );
+		} catch ( error ) {
+			runtimeState.unsavedBaselines.set( blockId, block );
+			logWriteError( error );
+		}
+	}
 };
 
 const isDue = ( blockId, now ) =>
@@ -27,7 +54,7 @@ const isDue = ( blockId, now ) =>
  *
  * Each block keeps its own one-minute rhythm, so a block's first snapshot and its
  * next checkpoint are never seconds apart. Blocks that are not due stay marked as
- * edited and are saved on a later tick.
+ * edited and are saved on a later tick, as are blocks whose save failed.
  */
 export const runCheckpoint = async () => {
 	if (
@@ -46,6 +73,7 @@ export const runCheckpoint = async () => {
 		}
 
 		scanEditorBlocks();
+		await saveUnsavedBaselines( postId );
 		const now = Date.now();
 
 		for ( const blockId of getDirtyBlockIds() ) {
@@ -59,7 +87,12 @@ export const runCheckpoint = async () => {
 			clearDirtyBlock( blockId );
 
 			if ( block ) {
-				await persistSnapshotIfChanged( blockId, block, postId );
+				try {
+					await persistSnapshotIfChanged( blockId, block, postId );
+				} catch ( error ) {
+					markBlockDirty( blockId );
+					logWriteError( error );
+				}
 			}
 		}
 	} finally {
@@ -84,8 +117,12 @@ const saveAllBeforeUnload = () => {
 		const postId = select( 'core/editor' ).getCurrentPostId();
 		const { baselines } = scanEditorBlocks( { persistBaselines: false } );
 		const dirtyBlockIds = getDirtyBlockIds();
+		const unsavedBaselines = Array.from(
+			runtimeState.unsavedBaselines,
+			( [ blockId, block ] ) => ( { blockId, block } )
+		);
 		const entries = [
-			...baselines.map( ( baseline ) => ( {
+			...[ ...unsavedBaselines, ...baselines ].map( ( baseline ) => ( {
 				...baseline,
 				metadata: { isBaseline: true },
 			} ) ),
@@ -95,8 +132,23 @@ const saveAllBeforeUnload = () => {
 			} ) ),
 		];
 
-		if ( persistSnapshotsNow( entries, postId ) ) {
+		// If the write fails (e.g. storage is full) and the page stays open, as when
+		// leaving is cancelled, everything is saved again later.
+		const restoreUnsaved = () => {
+			dirtyBlockIds.forEach( markBlockDirty );
+			[ ...unsavedBaselines, ...baselines ].forEach(
+				( { blockId, block } ) =>
+					runtimeState.unsavedBaselines.set( blockId, block )
+			);
+		};
+
+		if (
+			persistSnapshotsNow( entries, postId, {
+				onFailed: restoreUnsaved,
+			} )
+		) {
 			dirtyBlockIds.forEach( clearDirtyBlock );
+			runtimeState.unsavedBaselines.clear();
 		}
 	} catch ( error ) {
 		logError( error );

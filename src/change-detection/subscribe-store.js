@@ -18,6 +18,7 @@ import {
 	persistSnapshotIfChanged,
 } from '../snapshots/snapshot-service';
 import { runtimeState } from '../state/runtime-state';
+import { isQuotaExceededError } from '../state/storage-status';
 import { generateId } from '../utils/generate-id';
 import { isEmptyBlock } from '../utils/is-empty-block';
 
@@ -30,6 +31,16 @@ const areMapsEqual = ( left, right ) =>
 const logError = ( error ) => {
 	// eslint-disable-next-line no-console
 	console.error( 'Block Rewind block scan error:', error );
+};
+
+// Keeps a pre-edit state that couldn't be saved, so the next save tries it again.
+// A full storage is shown in the sidebar instead of being logged.
+const keepUnsavedBaseline = ( blockId, block ) => ( error ) => {
+	runtimeState.unsavedBaselines.set( blockId, block );
+
+	if ( ! isQuotaExceededError( error ) ) {
+		logError( error );
+	}
 };
 
 // Compares two block states; hashes are cached per block object, so this is cheap.
@@ -176,7 +187,7 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 		for ( const { blockId, block } of baselines ) {
 			persistSnapshotIfChanged( blockId, block, postId, {
 				isBaseline: true,
-			} ).catch( logError );
+			} ).catch( keepUnsavedBaseline( blockId, block ) );
 		}
 	}
 
