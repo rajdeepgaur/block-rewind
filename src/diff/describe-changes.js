@@ -3,7 +3,7 @@ import {
 	computeBlockHash,
 	stableStringify,
 } from '../serialization/serialize-block';
-import { hasExternalInnerBlocks } from '../utils/external-content';
+import { getBlockName, getOwnInnerBlocks } from '../utils/external-content';
 import { countSegmentWords, diffWords } from './diff-words';
 
 // Attributes whose string values are the block's readable text.
@@ -57,11 +57,6 @@ const toTextValue = ( value ) => {
 
 	return null;
 };
-
-const getBlockName = ( block ) => block?.name || block?.blockName || '';
-
-const getOwnInnerBlocks = ( block ) =>
-	! block || hasExternalInnerBlocks( block ) ? [] : block.innerBlocks || [];
 
 const isTextAttribute = ( key, value ) =>
 	TEXT_KEY_PATTERN.test( key ) && toTextValue( value ) !== null;
@@ -148,7 +143,8 @@ const diffAttributePaths = ( fromValue, toValue, prefix = '' ) => {
 	return paths;
 };
 
-const getPath = ( object, path ) =>
+// Reads a dotted path, e.g. "style.spacing.padding", from plain attribute objects.
+export const getPath = ( object, path ) =>
 	path
 		.split( '.' )
 		.reduce(

@@ -3,10 +3,6 @@ import { dispatch } from '@wordpress/data';
 import { BLOCK_ID_ATTRIBUTE } from '../constants';
 import { runtimeState } from '../state/runtime-state';
 
-// Reads the plugin-specific persistent ID from a block.
-export const getBlockIdAttribute = ( block ) =>
-	block?.attributes?.[ BLOCK_ID_ATTRIBUTE ] || null;
-
 const trackedIdListeners = new Set();
 
 // Registers a listener called whenever a scan changes which blocks are tracked.

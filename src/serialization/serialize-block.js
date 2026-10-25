@@ -1,5 +1,5 @@
 import { BLOCK_ID_ATTRIBUTE } from '../constants';
-import { hasExternalInnerBlocks } from '../utils/external-content';
+import { getBlockName, getOwnInnerBlocks } from '../utils/external-content';
 
 // Stable strings and hashes are cached per block object. Editor blocks are
 // immutable, so an unchanged block (or subtree) is never serialized twice.
@@ -9,12 +9,6 @@ const hashCache = new WeakMap();
 // Creates a deep-cloned JSON-safe value for deterministic persistence.
 const cloneSerializable = ( value ) =>
 	JSON.parse( JSON.stringify( value ?? null ) );
-
-const getBlockName = ( block ) => block.name || block.blockName || '';
-
-// Inner blocks that belong to another entity are not part of a block's own content.
-const getOwnInnerBlocks = ( block ) =>
-	hasExternalInnerBlocks( block ) ? [] : block.innerBlocks || [];
 
 // Removes the plugin's own block ID from an attributes object.
 const withoutBlockId = ( attributes = {} ) => {
@@ -54,7 +48,7 @@ export const stableStringify = ( value ) => {
 
 // Returns a 53-bit hash (cyrb53) of a string as a hex string.
 /* eslint-disable no-bitwise */
-export const hashString = ( input ) => {
+const hashString = ( input ) => {
 	let h1 = 0xdeadbeef;
 	let h2 = 0x41c6ce57;
 
