@@ -6,21 +6,12 @@ const {
 	flushHistory,
 	getBlockIds,
 	getVersionRows,
+	hideTab,
 	openHistorySidebar,
 	openSavedPost,
+	putSnapshot,
 	readSnapshots,
 } = require( './utils' );
-
-// Deselects and selects the block again, so the sidebar reloads its history after
-// a save that does not notify it (the page-exit save).
-const reselectFirstBlock = async ( page ) => {
-	await page.evaluate( () => {
-		const { select, dispatch } = window.wp.data;
-		const [ block ] = select( 'core/block-editor' ).getBlocks();
-		dispatch( 'core/block-editor' ).clearSelectedBlock();
-		dispatch( 'core/block-editor' ).selectBlock( block.clientId, null );
-	} );
-};
 
 test.describe( 'History sidebar', () => {
 	test( 'flags the version saved before editing', async ( {
@@ -45,12 +36,33 @@ test.describe( 'History sidebar', () => {
 			] );
 
 		const sidebar = await openHistorySidebar( page );
-		await reselectFirstBlock( page );
 		const entries = getVersionRows( sidebar );
 		await expect( entries ).toHaveCount( 2 );
 		await expect( entries.first() ).toContainText( 'Current' );
 		await expect( entries.first() ).toContainText( 'Text: 1 word added' );
 		await expect( entries.last() ).toContainText( 'Before editing' );
+	} );
+
+	test( 'updates the open list after the page-exit save and after cleanup', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+		const blockId = await editParagraph( { editor, page } );
+		const sidebar = await openHistorySidebar( page );
+		const entries = getVersionRows( sidebar );
+		await expect( entries ).toHaveCount( 1 );
+
+		await flushHistory( page );
+		await expect( entries ).toHaveCount( 2 );
+
+		// Both versions expire, and switching tabs runs the cleanup.
+		for ( const snapshot of await readSnapshots( page, blockId ) ) {
+			await putSnapshot( page, { ...snapshot, expiresAt: 1 } );
+		}
+		await hideTab( page );
+		await expect( entries ).toHaveCount( 0 );
 	} );
 
 	test( 'asks for a single block when several are selected', async ( {

@@ -9,6 +9,8 @@ export const runtimeState = {
 	observedByBlockId: new Map(),
 	// Block IDs whose pre-edit state was already saved this session.
 	baselineCapturedIds: new Set(),
+	// blockId -> pre-edit state whose save failed (e.g. storage full), saved again later.
+	unsavedBaselines: new Map(),
 	// clientId -> block state captured when an untracked block was selected.
 	pendingBaselines: new Map(),
 	previousSelectedClientId: null,

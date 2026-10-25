@@ -7,6 +7,11 @@ import './styles.css';
 
 import { describeChanges } from '../../diff/describe-changes';
 import {
+	describeMissingBlockTypes,
+	findMissingBlockTypes,
+	getRestorableVersion,
+} from '../../restore/restore-snapshot';
+import {
 	formatRelativeTime,
 	formatShortTime,
 	formatSnapshotTimestamp,
@@ -140,8 +145,13 @@ export const CompareModal = ( {
 	const nestedRef = useRef();
 	const [ view, setView ] = useState( 'version' );
 
+	const missingBlockTypes = useMemo(
+		() => findMissingBlockTypes( snapshot ),
+		[ snapshot ]
+	);
+	// Attributes a restore would drop are left out of the comparison.
 	const changes = useMemo(
-		() => describeChanges( currentBlock, snapshot ),
+		() => describeChanges( currentBlock, getRestorableVersion( snapshot ) ),
 		[ currentBlock, snapshot ]
 	);
 	const rows = useMemo(
@@ -321,20 +331,36 @@ export const CompareModal = ( {
 							{ nestedWarning }
 						</p>
 					) }
-					<p>
-						{ __(
-							'Your current block is saved to history first, and you can undo the restore.',
-							'block-rewind'
-						) }
-					</p>
+					{ missingBlockTypes.length ? (
+						<p
+							id={ `${ idPrefix }-not-restorable` }
+							className="block-rewind-compare__footer-warning"
+						>
+							{ describeMissingBlockTypes( missingBlockTypes ) }
+						</p>
+					) : (
+						<p>
+							{ __(
+								'Your current block is saved to history first, and you can undo the restore.',
+								'block-rewind'
+							) }
+						</p>
+					) }
 				</div>
 				<Button variant="tertiary" onClick={ onClose }>
 					{ __( 'Cancel', 'block-rewind' ) }
 				</Button>
 				<Button
 					variant="primary"
-					disabled={ ! changes.hasChanges }
+					disabled={
+						! changes.hasChanges || missingBlockTypes.length > 0
+					}
 					accessibleWhenDisabled
+					aria-describedby={
+						missingBlockTypes.length
+							? `${ idPrefix }-not-restorable`
+							: undefined
+					}
 					onClick={ () => onRestore( snapshot ) }
 				>
 					{ __( 'Restore this version', 'block-rewind' ) }

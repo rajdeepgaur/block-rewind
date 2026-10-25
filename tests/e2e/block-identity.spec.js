@@ -2,12 +2,36 @@ const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
 const {
 	editParagraph,
+	flushHistory,
 	getBlockIds,
 	getVersionRows,
 	openHistorySidebar,
 	openSavedPost,
 	readSnapshotContents,
 } = require( './utils' );
+
+// History IDs of every block on the canvas, template blocks included.
+const getAllCanvasBlockIds = ( page ) =>
+	page.evaluate( () => {
+		const blockEditorSelect = window.wp.data.select( 'core/block-editor' );
+		return blockEditorSelect
+			.getClientIdsWithDescendants()
+			.map(
+				( clientId ) =>
+					blockEditorSelect.getBlockAttributes( clientId )
+						?.blockRewindId
+			)
+			.filter( Boolean );
+	} );
+
+const setRenderingMode = ( page, mode ) =>
+	page.evaluate(
+		( renderingMode ) =>
+			window.wp.data
+				.dispatch( 'core/editor' )
+				.setRenderingMode( renderingMode ),
+		mode
+	);
 
 test.describe( 'Block identity', () => {
 	test( 'selecting a block does not change the post', async ( {
@@ -188,5 +212,45 @@ test.describe( 'Block identity', () => {
 				{ blockName: 'core/paragraph', content: 'Hello' },
 				{ blockName: 'core/paragraph', content: 'Hello world' },
 			] );
+	} );
+
+	test( "tracks the post's blocks while the template is shown", async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		const postId = await openSavedPost( { admin, editor, page } );
+		await setRenderingMode( page, 'template-locked' );
+		// Template blocks are disabled; the post's paragraph is inside Post Content.
+		const paragraph = editor.canvas
+			.locator( '.wp-block-post-content' )
+			.getByRole( 'document', { name: 'Block: Paragraph' } );
+
+		await paragraph.click();
+		await page.keyboard.press( 'End' );
+		await page.keyboard.type( ' world' );
+		await expect
+			.poll( () => getAllCanvasBlockIds( page ) )
+			.toHaveLength( 1 );
+		const [ blockId ] = await getAllCanvasBlockIds( page );
+
+		await flushHistory( page );
+		await expect
+			.poll( () => readSnapshotContents( page, blockId ) )
+			.toEqual( [
+				{ blockName: 'core/paragraph', content: 'Hello' },
+				{ blockName: 'core/paragraph', content: 'Hello world' },
+			] );
+
+		// After a reload, the saved versions are listed for the block.
+		await editor.saveDraft();
+		await admin.editPost( postId );
+		await setRenderingMode( page, 'template-locked' );
+		await paragraph.click();
+		const sidebar = await openHistorySidebar( page );
+		await expect( getVersionRows( sidebar ) ).toHaveCount( 2 );
+		expect( await getAllCanvasBlockIds( page ) ).toEqual( [ blockId ] );
+
+		await setRenderingMode( page, 'post-only' );
 	} );
 } );

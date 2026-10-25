@@ -10,3 +10,5 @@ export const CHECKPOINT_INTERVAL_MS = 60 * 1000;
 export const CHECKPOINT_TICK_MS = 5 * 1000;
 export const EXPIRY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 export const SCAN_THROTTLE_MS = 200;
+// Opening browser storage that takes longer is treated as unavailable.
+export const STORAGE_OPEN_TIMEOUT_MS = 10 * 1000;

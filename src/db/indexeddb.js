@@ -183,18 +183,26 @@ export const putSnapshot = ( snapshot, maxSnapshotsPerBlock ) =>
  * reliably than work queued behind promises. Nothing is pruned here, since extra steps
  * would delay the commit; the next regular write prunes the block.
  *
- * @param {Object[]} snapshots Snapshot records to store.
+ * @param {Object[]} snapshots            Snapshot records to store.
+ * @param {Object}   callbacks            Optional callbacks.
+ * @param {Function} callbacks.onComplete Called when the write commits.
+ * @param {Function} callbacks.onAbort    Called with the error when a started write fails.
  * @return {boolean} Whether the write was started.
  */
-export const putSnapshotsNow = ( snapshots ) => {
+export const putSnapshotsNow = ( snapshots, { onComplete, onAbort } = {} ) => {
 	if ( ! connectedDatabase || ! snapshots.length ) {
 		return false;
 	}
 
 	try {
-		const store = connectedDatabase
-			.transaction( SNAPSHOT_STORE, 'readwrite' )
-			.objectStore( SNAPSHOT_STORE );
+		const transaction = connectedDatabase.transaction(
+			SNAPSHOT_STORE,
+			'readwrite'
+		);
+		transaction.oncomplete = () => onComplete?.();
+		transaction.onabort = () => onAbort?.( transaction.error );
+
+		const store = transaction.objectStore( SNAPSHOT_STORE );
 		snapshots.forEach( ( snapshot ) => store.put( snapshot ) );
 		return true;
 	} catch ( error ) {
@@ -244,18 +252,41 @@ export const getLatestSnapshotByPostAndBlock = ( postId, blockId ) => {
 	} );
 };
 
-// Deletes all snapshots that have passed their expiration timestamp.
-export const deleteExpiredSnapshots = ( now ) =>
-	runTransaction( 'readwrite', ( store ) => {
+// Expired snapshots deleted per transaction, so other writes can run in between.
+const EXPIRED_DELETE_CHUNK_SIZE = 2000;
+
+// Deletes up to `limit` expired snapshots in one transaction and resolves with the count.
+// A key cursor walks the index without reading the records themselves.
+const deleteExpiredChunk = ( now, limit ) =>
+	runTransaction( 'readwrite', ( store, setResult ) => {
+		let deleted = 0;
+		setResult( deleted );
+
 		const request = store
 			.index( BY_EXPIRES_AT )
-			.openCursor( window.IDBKeyRange.upperBound( now ) );
+			.openKeyCursor( window.IDBKeyRange.upperBound( now ) );
 
 		request.onsuccess = () => {
 			const cursor = request.result;
-			if ( cursor ) {
-				cursor.delete();
+			if ( cursor && deleted < limit ) {
+				store.delete( cursor.primaryKey );
+				deleted += 1;
+				setResult( deleted );
 				cursor.continue();
 			}
 		};
 	} );
+
+// Deletes all snapshots that have passed their expiration timestamp, in chunks.
+// Resolves with the number of snapshots deleted.
+export const deleteExpiredSnapshots = async ( now ) => {
+	let total = 0;
+	let deleted;
+
+	do {
+		deleted = await deleteExpiredChunk( now, EXPIRED_DELETE_CHUNK_SIZE );
+		total += deleted;
+	} while ( deleted === EXPIRED_DELETE_CHUNK_SIZE );
+
+	return total;
+};

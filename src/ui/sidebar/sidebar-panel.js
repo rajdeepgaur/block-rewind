@@ -3,7 +3,7 @@ import { Button, Notice } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useState, useSyncExternalStore } from '@wordpress/element';
+import { useCallback, useEffect, useState } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
 
 import './styles.css';
@@ -11,12 +11,9 @@ import './styles.css';
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
 import { computeBlockHash } from '../../serialization/serialize-block';
 import { settings } from '../../settings';
-import {
-	getStorageStatus,
-	subscribeToStorageStatus,
-} from '../../state/storage-status';
 import { CompareModal } from '../compare/compare-modal';
 import { useNow } from '../use-now';
+import { useStorageStatus } from '../use-storage-status';
 import { BlockHeader } from './block-header';
 import { NestedHistory } from './nested-history';
 import { useSelectedBlockHistory } from './use-selected-block-history';
@@ -97,12 +94,35 @@ const describeVersionCount = ( count ) =>
 		formatRetention( settings.snapshotTtlMs )
 	);
 
+// Explains that new versions aren't saved while the browser's storage is full.
+// Existing versions stay listed below it.
+const StorageFullNotice = () => {
+	if ( useStorageStatus() !== 'full' ) {
+		return null;
+	}
+
+	return (
+		<div className="block-rewind-sidebar__notice">
+			<Notice status="warning" isDismissible={ false }>
+				<p>
+					<strong>
+						{ __( 'New versions can’t be saved', 'block-rewind' ) }
+					</strong>
+				</p>
+				<p>
+					{ __(
+						'This browser’s storage is full. Earlier versions are still here, and your post isn’t affected. Versions will be saved again once the browser has space, for example after you clear data for other sites.',
+						'block-rewind'
+					) }
+				</p>
+			</Notice>
+		</div>
+	);
+};
+
 // Renders the history of the selected block, or explains why there is none.
 const SidebarContent = () => {
-	const storageStatus = useSyncExternalStore(
-		subscribeToStorageStatus,
-		getStorageStatus
-	);
+	const storageStatus = useStorageStatus();
 	const { selectedBlock, selectedCount, postId } = useSelect( ( select ) => {
 		const blockEditor = select( blockEditorStore );
 		return {
@@ -118,6 +138,23 @@ const SidebarContent = () => {
 	);
 	const now = useNow();
 	const [ comparedSnapshot, setComparedSnapshot ] = useState( null );
+	// The version a restore just recorded, which takes focus once it is listed: the
+	// focused Restore or Compare button goes away when its version becomes current.
+	const [ focusRequest, setFocusRequest ] = useState( null );
+	const clearFocusRequest = useCallback( () => setFocusRequest( null ), [] );
+
+	useEffect( clearFocusRequest, [ blockId, clearFocusRequest ] );
+
+	const restore = async ( snapshot ) => {
+		const requestedAt = Date.now();
+
+		if ( await restoreSnapshotToEditor( snapshot ) ) {
+			setFocusRequest( {
+				restoredFrom: snapshot.timestamp,
+				savedAfter: requestedAt,
+			} );
+		}
+	};
 
 	const closeCompare = () => setComparedSnapshot( null );
 
@@ -125,7 +162,7 @@ const SidebarContent = () => {
 		closeCompare();
 		// Let the modal unmount before the block changes.
 		window.setTimeout( () => {
-			restoreSnapshotToEditor( snapshot );
+			restore( snapshot );
 		}, 0 );
 	};
 
@@ -251,7 +288,9 @@ const SidebarContent = () => {
 				currentIndex={ currentIndex }
 				now={ now }
 				onCompare={ setComparedSnapshot }
-				onRestore={ restoreSnapshotToEditor }
+				onRestore={ restore }
+				focusRequest={ focusRequest }
+				onFocusHandled={ clearFocusRequest }
 			/>
 		);
 	}
@@ -295,6 +334,7 @@ export const registerHistorySidebar = () => {
 					title={ __( 'Block Rewind', 'block-rewind' ) }
 					icon="backup"
 				>
+					<StorageFullNotice />
 					<SidebarContent />
 				</PluginSidebar>
 			</>
