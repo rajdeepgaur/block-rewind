@@ -4,6 +4,9 @@ const EXTERNAL_CONTENT_BLOCK_TYPES = new Set( [
 	'core/template-part',
 ] );
 
+// The block type of an editor block (`name`) or a stored snapshot (`blockName`).
+export const getBlockName = ( block ) => block?.name || block?.blockName || '';
+
 /**
  * Checks whether a block's inner blocks are stored outside the post.
  *
@@ -15,10 +18,14 @@ const EXTERNAL_CONTENT_BLOCK_TYPES = new Set( [
  * @return {boolean} Whether the inner blocks belong to another entity.
  */
 export const hasExternalInnerBlocks = ( block ) => {
-	const name = block?.name || block?.blockName;
+	const name = getBlockName( block );
 
 	return (
 		EXTERNAL_CONTENT_BLOCK_TYPES.has( name ) ||
 		( name === 'core/navigation' && Boolean( block.attributes?.ref ) )
 	);
 };
+
+// Inner blocks that are part of a block's own content; none for shared entities.
+export const getOwnInnerBlocks = ( block ) =>
+	! block || hasExternalInnerBlocks( block ) ? [] : block.innerBlocks || [];

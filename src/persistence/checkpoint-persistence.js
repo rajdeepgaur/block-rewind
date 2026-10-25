@@ -61,7 +61,7 @@ const isDue = ( blockId, now ) =>
  * @param {boolean} options.saveAll Save every edited block, due or not. If a checkpoint
  *                                  is already running, this one runs right after it.
  */
-export const runCheckpoint = async ( { saveAll = false } = {} ) => {
+const runCheckpoint = async ( { saveAll = false } = {} ) => {
 	if (
 		runtimeState.checkpointInProgress ||
 		runtimeState.isRestoringSnapshot

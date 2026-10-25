@@ -1,7 +1,9 @@
 import { getBlockType } from '@wordpress/blocks';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
+import { getPath } from '../diff/describe-changes';
 import { countWords } from '../diff/diff-words';
+import { truncateText } from '../utils/truncate-text';
 
 // Readable names of common block attributes, keyed by attribute name.
 const ATTRIBUTE_LABELS = {
@@ -130,19 +132,7 @@ export const getAttributeGroup = ( path ) => {
 export const getBlockTitle = ( blockName ) =>
 	getBlockType( blockName )?.title || blockName;
 
-const getPath = ( object, path ) =>
-	path
-		.split( '.' )
-		.reduce(
-			( value, key ) =>
-				value && typeof value === 'object' ? value[ key ] : undefined,
-			object
-		);
-
-const truncate = ( text ) =>
-	text.length > MAX_VALUE_LENGTH
-		? `${ text.slice( 0, MAX_VALUE_LENGTH - 1 ) }…`
-		: text;
+const truncate = ( text ) => truncateText( text, MAX_VALUE_LENGTH );
 
 // Finds a preset by slug, including "var:preset|color|accent-1" references.
 const findPreset = ( presets, value ) => {
@@ -233,7 +223,7 @@ const describePlainValue = ( value ) => {
  * @param {Object} presets  Editor presets: `{ colors, fontSizes, gradients }`.
  * @return {{text: string, swatch?: string}} Display text and an optional color.
  */
-export const formatAttributeValue = ( key, settings, presets = {} ) => {
+const formatAttributeValue = ( key, settings, presets = {} ) => {
 	const value = getPath( settings, key );
 
 	if ( key === 'layout' ) {

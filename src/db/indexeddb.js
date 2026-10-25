@@ -1,7 +1,7 @@
 import { DB_NAME_PREFIX, DB_VERSION, SNAPSHOT_STORE } from '../constants';
 import { settings } from '../settings';
 
-export const DB_NAME = `${ DB_NAME_PREFIX }${ settings.storageKey }`;
+const DB_NAME = `${ DB_NAME_PREFIX }${ settings.storageKey }`;
 
 const BY_POST_BLOCK_TIME = 'byPostBlockTime';
 const BY_EXPIRES_AT = 'byExpiresAt';
