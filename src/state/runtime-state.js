@@ -14,6 +14,9 @@ export const runtimeState = {
 	// clientId -> block state captured when an untracked block was selected.
 	pendingBaselines: new Map(),
 	previousSelectedClientId: null,
+	// The post whose blocks are tracked. Kept while a template or pattern is shown, so
+	// the post's edits are still saved under it.
+	trackedPostId: null,
 	// 'pending' until orphaned histories were matched against the loaded post once.
 	relinkStatus: 'pending',
 	isRestoringSnapshot: false,
@@ -22,4 +25,6 @@ export const runtimeState = {
 	checkpointTimerId: null,
 	cleanupTimerId: null,
 	checkpointInProgress: false,
+	// A save of every edited block was asked for while a checkpoint was running.
+	saveAllRequested: false,
 };

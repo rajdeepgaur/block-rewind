@@ -43,7 +43,8 @@ add_filter( 'register_block_type_args', 'block_rewind_register_block_id_attribut
  * Checks whether the current admin screen is the post editor.
  *
  * Block editor assets also load in the Site Editor, Widgets screen and
- * Customizer, which the history runtime does not support.
+ * Customizer, which the history runtime does not support. Shared site content
+ * (templates, patterns, menus) is left out in the post editor too.
  *
  * @return bool
  */
@@ -54,7 +55,10 @@ function block_rewind_is_post_editor_screen() {
 
 	$screen = get_current_screen();
 
-	return $screen && 'post' === $screen->base && $screen->is_block_editor();
+	return $screen
+		&& 'post' === $screen->base
+		&& $screen->is_block_editor()
+		&& ! in_array( $screen->post_type, array( 'wp_template', 'wp_template_part', 'wp_block', 'wp_navigation' ), true );
 }
 
 /**

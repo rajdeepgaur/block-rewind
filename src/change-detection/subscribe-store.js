@@ -12,6 +12,7 @@ import {
 } from '../identity/resolve-block-identities';
 import { computeBlockHash } from '../serialization/serialize-block';
 import { getAllEditorBlocks } from '../selectors/block-tree';
+import { isEditingSharedContent } from '../selectors/edited-entity';
 import { matchOrphanedHistories } from '../identity/match-orphaned-histories';
 import {
 	listSnapshotsForPost,
@@ -51,6 +52,10 @@ const hasContentChanged = ( previousBlock, nextBlock ) =>
 // Remembers the state of a newly selected, untracked block so its first edit has a baseline.
 // Runs synchronously on every store change so the state is captured before any edit lands.
 const captureSelectionBaseline = () => {
+	if ( isEditingSharedContent() ) {
+		return;
+	}
+
 	const blockEditorSelect = select( 'core/block-editor' );
 	const clientId = blockEditorSelect.getSelectedBlockClientId();
 
@@ -83,6 +88,9 @@ const captureSelectionBaseline = () => {
  * once per session as its baseline snapshot, unless that state was empty (e.g. a
  * block that was just inserted).
  *
+ * While a template or pattern is shown instead of the post, nothing is scanned and the
+ * results of the last scan of the post are kept, so its edited blocks can still be saved.
+ *
  * @param {Object}  options                  Options.
  * @param {boolean} options.persistBaselines Save new baselines in the background. The
  *                                           page-exit save turns this off and writes
@@ -94,6 +102,13 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 		clearTimeout( runtimeState.scanTimerId );
 		runtimeState.scanTimerId = null;
 	}
+
+	if ( isEditingSharedContent() ) {
+		return { baselines: [] };
+	}
+
+	const postId = select( 'core/editor' ).getCurrentPostId();
+	runtimeState.trackedPostId = postId;
 
 	const blocks = getAllEditorBlocks();
 	const { idByClientId, writes } = resolveBlockIdentities(
@@ -180,8 +195,6 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 	if ( trackedIdsChanged ) {
 		notifyTrackedIdsChanged();
 	}
-
-	const postId = select( 'core/editor' ).getCurrentPostId();
 
 	if ( persistBaselines ) {
 		for ( const { blockId, block } of baselines ) {
