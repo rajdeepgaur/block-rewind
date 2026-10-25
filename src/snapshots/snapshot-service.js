@@ -108,7 +108,8 @@ const writeSnapshot = async ( snapshot ) => {
 	setStorageStatus( 'ready' );
 };
 
-// Registers a listener called after a snapshot is written. Returns an unsubscribe function.
+// Registers a listener called with each snapshot written, or with null after expired
+// snapshots of any block were removed. Returns an unsubscribe function.
 export const subscribeToSnapshotChanges = ( listener ) => {
 	changeListeners.add( listener );
 	return () => changeListeners.delete( listener );
@@ -247,7 +248,10 @@ export const persistSnapshotsNow = ( entries, postId, { onFailed } = {} ) => {
 	}
 
 	const started = putSnapshotsNow( snapshots, {
-		onComplete: () => setStorageStatus( 'ready' ),
+		onComplete: () => {
+			setStorageStatus( 'ready' );
+			snapshots.forEach( notifySnapshotChange );
+		},
 		onAbort: ( error ) => {
 			snapshots.forEach( forgetLastSaved );
 			if ( isQuotaExceededError( error ) ) {
@@ -264,13 +268,33 @@ export const persistSnapshotsNow = ( entries, postId, { onFailed } = {} ) => {
 
 let runningCleanup = null;
 
+// Forgets latest known versions that have expired, so they aren't taken as saved.
+const forgetExpiredLastSaved = ( now ) => {
+	for ( const [ blockId, { timestamp } ] of lastSavedByBlockId ) {
+		if ( timestamp + settings.snapshotTtlMs <= now ) {
+			lastSavedByBlockId.delete( blockId );
+		}
+	}
+};
+
 // Removes expired snapshots using the current timestamp. A call made while a cleanup
-// is running shares it instead of starting another.
+// is running shares it instead of starting another. Listeners are told when anything
+// was removed, so an open history list drops those versions.
 export const runSnapshotExpiryCleanup = () => {
 	if ( ! runningCleanup ) {
-		runningCleanup = deleteExpiredSnapshots( Date.now() ).finally( () => {
-			runningCleanup = null;
-		} );
+		const now = Date.now();
+
+		runningCleanup = deleteExpiredSnapshots( now )
+			.then( ( deletedCount ) => {
+				if ( deletedCount ) {
+					forgetExpiredLastSaved( now );
+					notifySnapshotChange( null );
+				}
+				return deletedCount;
+			} )
+			.finally( () => {
+				runningCleanup = null;
+			} );
 	}
 
 	return runningCleanup;

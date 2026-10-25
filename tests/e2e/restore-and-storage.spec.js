@@ -343,6 +343,65 @@ test.describe( 'Restore', () => {
 		expect( ( await getFirstBlock( page ) ).content ).toBe( 'Hello world' );
 	} );
 
+	test( 'compare shows what a restore can actually do', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		const postId = await openSavedPost( { admin, editor, page } );
+		const blockId = await editParagraph( { editor, page } );
+		await expect
+			.poll( () => readSnapshots( page, blockId ) )
+			.toHaveLength( 1 );
+
+		const version = {
+			blockId,
+			postId,
+			innerBlocks: [],
+			expiresAt: Date.now() + 60 * 60 * 1000,
+		};
+		// Earlier today than every real version, so both are listed last.
+		const startOfDay = new Date().setHours( 0, 0, 0, 0 );
+		await putSnapshot( page, {
+			...version,
+			snapshotId: 'e2e-missing',
+			blockName: 'block-rewind-e2e/missing',
+			attributes: {},
+			timestamp: startOfDay,
+			hash: 'e2e-missing',
+		} );
+		await putSnapshot( page, {
+			...version,
+			snapshotId: 'e2e-unregistered-attribute',
+			blockName: 'core/paragraph',
+			attributes: { content: 'Hello', acmeSetting: 'custom' },
+			timestamp: startOfDay + 1,
+			hash: 'e2e-unregistered-attribute',
+		} );
+
+		const sidebar = await openHistorySidebar( page );
+		const entries = getVersionRows( sidebar );
+		await expect( entries ).toHaveCount( 3 );
+		const dialog = page.getByRole( 'dialog' );
+		const restoreButton = dialog.getByRole( 'button', {
+			name: 'Restore this version',
+		} );
+
+		// A version with block types that are no longer registered.
+		await clickVersionAction( entries.last(), 'Compare' );
+		await expect( restoreButton ).toBeDisabled();
+		await expect( restoreButton ).toHaveAccessibleDescription(
+			/uses blocks that are no longer available: block-rewind-e2e\/missing/
+		);
+		await dialog.getByRole( 'button', { name: 'Cancel' } ).click();
+
+		// An attribute the block type no longer registers isn't listed as a change.
+		await clickVersionAction( entries.nth( 1 ), 'Compare' );
+		await expect( restoreButton ).toBeEnabled();
+		await expect( dialog.locator( 'table' ) ).toContainText( 'Text' );
+		await expect( dialog ).not.toContainText( /acme/i );
+	} );
+
 	test( 'restores from the compare modal', async ( {
 		admin,
 		editor,
@@ -606,6 +665,32 @@ test.describe( 'Storage', () => {
 		await expect(
 			sidebar.getByText( 'New versions can’t be saved' )
 		).toBeHidden();
+	} );
+
+	test( 'shows the storage notice when opening storage never finishes', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+
+		// Only the plugin's database; the editor opens others too.
+		await page.addInitScript( () => {
+			const { open } = window.indexedDB;
+			window.indexedDB.open = function ( name, ...args ) {
+				return name.startsWith( 'block-rewind-history-' )
+					? {}
+					: open.call( this, name, ...args );
+			};
+		} );
+		await page.clock.install();
+		await page.reload();
+
+		const sidebar = await openHistorySidebar( page );
+		await page.clock.fastForward( 11 * 1000 );
+		await expect(
+			sidebar.getByText( 'Block history is off in this browser' )
+		).toBeVisible();
 	} );
 
 	test( 'shows a notice and tracks nothing when browser storage is unavailable', async ( {

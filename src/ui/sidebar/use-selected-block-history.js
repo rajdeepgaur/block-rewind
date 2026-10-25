@@ -5,7 +5,8 @@ import {
 	subscribeToSnapshotChanges,
 } from '../../snapshots/snapshot-service';
 
-// Loads snapshots for a tracked block and reloads them when new ones are saved.
+// Loads snapshots for a tracked block and reloads them when new ones are saved or
+// expired ones are removed.
 // `reload` loads them again, e.g. after a failed read.
 export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 	const [ snapshots, setSnapshots ] = useState( [] );
@@ -19,7 +20,7 @@ export const useSelectedBlockHistory = ( blockRewindId, postId ) => {
 		}
 
 		return subscribeToSnapshotChanges( ( snapshot ) => {
-			if ( snapshot.blockId === blockRewindId ) {
+			if ( ! snapshot || snapshot.blockId === blockRewindId ) {
 				setRevision( ( value ) => value + 1 );
 			}
 		} );

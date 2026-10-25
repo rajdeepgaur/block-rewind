@@ -9,6 +9,7 @@ import {
 	formatShortTime,
 	getTimeGroupLabel,
 } from '../../utils/format-snapshot-timestamp';
+import { truncateText } from '../../utils/truncate-text';
 import { getBlockTitle, summarizeChanges } from '../change-labels';
 import { useStorageStatus } from '../use-storage-status';
 
@@ -16,12 +17,11 @@ import { useStorageStatus } from '../use-storage-status';
 const INITIAL_VISIBLE_COUNT = 10;
 const EXCERPT_LENGTH = 160;
 
-const getExcerpt = ( snapshot ) => {
-	const text = getFullText( snapshot ).replace( /\s+/g, ' ' );
-	return text.length > EXCERPT_LENGTH
-		? `${ text.slice( 0, EXCERPT_LENGTH - 1 ) }…`
-		: text;
-};
+const getExcerpt = ( snapshot ) =>
+	truncateText(
+		getFullText( snapshot ).replace( /\s+/g, ' ' ),
+		EXCERPT_LENGTH
+	);
 
 const getNowNote = ( hasVersions, storageStatus ) => {
 	if ( storageStatus === 'full' ) {

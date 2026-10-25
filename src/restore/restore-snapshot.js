@@ -22,16 +22,55 @@ const showNotice = ( status, message, options = {} ) =>
 	} );
 
 // Collects block types used by a snapshot that are no longer registered.
-const findMissingBlockTypes = ( node, missing = new Set() ) => {
+const collectMissingBlockTypes = ( node, missing = new Set() ) => {
 	if ( ! getBlockType( node.blockName ) ) {
 		missing.add( node.blockName );
 	}
 
 	( node.innerBlocks || [] ).forEach( ( innerBlock ) =>
-		findMissingBlockTypes( innerBlock, missing )
+		collectMissingBlockTypes( innerBlock, missing )
 	);
 
 	return missing;
+};
+
+// Lists the block types used by a snapshot that are no longer registered.
+export const findMissingBlockTypes = ( snapshot ) =>
+	Array.from( collectMissingBlockTypes( snapshot ) );
+
+// Explains why a version using unregistered block types can't be restored.
+export const describeMissingBlockTypes = ( missingBlockTypes ) =>
+	sprintf(
+		/* translators: %s: comma-separated block type names, e.g. "my-plugin/slider". */
+		__(
+			'This version can’t be restored because it uses blocks that are no longer available: %s',
+			'block-rewind'
+		),
+		missingBlockTypes.join( ', ' )
+	);
+
+/**
+ * Returns a snapshot as restoring it would create it: attributes its block types no
+ * longer register are left out, as createBlock() drops them.
+ *
+ * @param {Object} snapshot Snapshot record, or one of its inner blocks.
+ * @return {Object} The snapshot with only registered attributes.
+ */
+export const getRestorableVersion = ( snapshot ) => {
+	const blockType = getBlockType( snapshot.blockName );
+	const attributes = blockType
+		? Object.fromEntries(
+				Object.entries( snapshot.attributes || {} ).filter(
+					( [ key ] ) => key in ( blockType.attributes || {} )
+				)
+		  )
+		: snapshot.attributes;
+
+	return {
+		...snapshot,
+		attributes,
+		innerBlocks: ( snapshot.innerBlocks || [] ).map( getRestorableVersion ),
+	};
 };
 
 // History IDs of the tracked blocks inside a block, by position, e.g. "0.2".
@@ -238,20 +277,11 @@ export const restoreSnapshotToEditor = async ( snapshot ) => {
 			return false;
 		}
 
-		const missingBlockTypes = Array.from(
-			findMissingBlockTypes( snapshot )
-		);
+		const missingBlockTypes = findMissingBlockTypes( snapshot );
 		if ( missingBlockTypes.length ) {
 			showNotice(
 				'error',
-				sprintf(
-					/* translators: %s: comma-separated block type names, e.g. "my-plugin/slider". */
-					__(
-						'This version can’t be restored because it uses blocks that are no longer available: %s',
-						'block-rewind'
-					),
-					missingBlockTypes.join( ', ' )
-				)
+				describeMissingBlockTypes( missingBlockTypes )
 			);
 			return false;
 		}
