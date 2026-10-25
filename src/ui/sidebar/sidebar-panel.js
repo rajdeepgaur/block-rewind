@@ -9,6 +9,7 @@ import { registerPlugin } from '@wordpress/plugins';
 import './styles.css';
 
 import { restoreSnapshotToEditor } from '../../restore/restore-snapshot';
+import { isEditingSharedContent } from '../../selectors/edited-entity';
 import { computeBlockHash } from '../../serialization/serialize-block';
 import { settings } from '../../settings';
 import { CompareModal } from '../compare/compare-modal';
@@ -123,14 +124,18 @@ const StorageFullNotice = () => {
 // Renders the history of the selected block, or explains why there is none.
 const SidebarContent = () => {
 	const storageStatus = useStorageStatus();
-	const { selectedBlock, selectedCount, postId } = useSelect( ( select ) => {
-		const blockEditor = select( blockEditorStore );
-		return {
-			selectedBlock: blockEditor.getSelectedBlock(),
-			selectedCount: blockEditor.getSelectedBlockClientIds().length,
-			postId: select( 'core/editor' ).getCurrentPostId(),
-		};
-	}, [] );
+	const { selectedBlock, selectedCount, postId, isPaused } = useSelect(
+		( select ) => {
+			const blockEditor = select( blockEditorStore );
+			return {
+				selectedBlock: blockEditor.getSelectedBlock(),
+				selectedCount: blockEditor.getSelectedBlockClientIds().length,
+				postId: select( 'core/editor' ).getCurrentPostId(),
+				isPaused: isEditingSharedContent(),
+			};
+		},
+		[]
+	);
 	const blockId = useTrackedBlockId( selectedBlock );
 	const { snapshots, isLoading, error, reload } = useSelectedBlockHistory(
 		blockId,
@@ -186,6 +191,20 @@ const SidebarContent = () => {
 					</p>
 				</Notice>
 			</div>
+		);
+	}
+
+	if ( isPaused ) {
+		return (
+			<EmptyState
+				icon={ <HistoryIcon /> }
+				title={ __( 'History is paused', 'block-rewind' ) }
+			>
+				{ __(
+					'Version history isn’t available while editing a template or pattern. Go back to the post to see it.',
+					'block-rewind'
+				) }
+			</EmptyState>
 		);
 	}
 

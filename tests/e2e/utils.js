@@ -53,13 +53,13 @@ const withHistoryStore = ( page, mode, callbackSource, argument ) =>
 		[ mode, callbackSource, argument ]
 	);
 
+// Returns every stored snapshot, of all posts and blocks.
+const readAllSnapshots = ( page ) =>
+	withHistoryStore( page, 'readonly', 'return store.getAll();' );
+
 // Returns a block's snapshots, oldest first.
 const readSnapshots = async ( page, blockId ) => {
-	const all = await withHistoryStore(
-		page,
-		'readonly',
-		'return store.getAll();'
-	);
+	const all = await readAllSnapshots( page );
 	return all
 		.filter( ( snapshot ) => snapshot.blockId === blockId )
 		.sort( ( a, b ) => a.timestamp - b.timestamp );
@@ -174,6 +174,7 @@ module.exports = {
 	openHistorySidebar,
 	openSavedPost,
 	putSnapshot,
+	readAllSnapshots,
 	readSnapshotContents,
 	readSnapshots,
 	seedExpiredSnapshots,

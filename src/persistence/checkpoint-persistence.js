@@ -1,4 +1,4 @@
-import { select } from '@wordpress/data';
+import { subscribe } from '@wordpress/data';
 
 import { CHECKPOINT_INTERVAL_MS, CHECKPOINT_TICK_MS } from '../constants';
 import {
@@ -7,6 +7,7 @@ import {
 	markBlockDirty,
 } from '../change-detection/dirty-registry';
 import { scanEditorBlocks } from '../change-detection/subscribe-store';
+import { isEditingSharedContent } from '../selectors/edited-entity';
 import {
 	getLastSaved,
 	persistSnapshotIfChanged,
@@ -55,29 +56,37 @@ const isDue = ( blockId, now ) =>
  * Each block keeps its own one-minute rhythm, so a block's first snapshot and its
  * next checkpoint are never seconds apart. Blocks that are not due stay marked as
  * edited and are saved on a later tick, as are blocks whose save failed.
+ *
+ * @param {Object}  options         Options.
+ * @param {boolean} options.saveAll Save every edited block, due or not. If a checkpoint
+ *                                  is already running, this one runs right after it.
  */
-export const runCheckpoint = async () => {
+export const runCheckpoint = async ( { saveAll = false } = {} ) => {
 	if (
 		runtimeState.checkpointInProgress ||
 		runtimeState.isRestoringSnapshot
 	) {
+		runtimeState.saveAllRequested ||= saveAll;
 		return;
 	}
+
+	saveAll ||= runtimeState.saveAllRequested;
+	runtimeState.saveAllRequested = false;
 
 	runtimeState.checkpointInProgress = true;
 
 	try {
-		const postId = select( 'core/editor' ).getCurrentPostId();
+		scanEditorBlocks();
+		const postId = runtimeState.trackedPostId;
 		if ( ! postId ) {
 			return;
 		}
 
-		scanEditorBlocks();
 		await saveUnsavedBaselines( postId );
 		const now = Date.now();
 
 		for ( const blockId of getDirtyBlockIds() ) {
-			if ( ! isDue( blockId, now ) ) {
+			if ( ! saveAll && ! isDue( blockId, now ) ) {
 				continue;
 			}
 
@@ -98,6 +107,10 @@ export const runCheckpoint = async () => {
 	} finally {
 		runtimeState.checkpointInProgress = false;
 	}
+
+	if ( runtimeState.saveAllRequested ) {
+		await runCheckpoint();
+	}
 };
 
 /**
@@ -114,8 +127,12 @@ const saveAllBeforeUnload = () => {
 	}
 
 	try {
-		const postId = select( 'core/editor' ).getCurrentPostId();
 		const { baselines } = scanEditorBlocks( { persistBaselines: false } );
+		const postId = runtimeState.trackedPostId;
+		if ( ! postId ) {
+			return;
+		}
+
 		const dirtyBlockIds = getDirtyBlockIds();
 		const unsavedBaselines = Array.from(
 			runtimeState.unsavedBaselines,
@@ -182,4 +199,20 @@ export const startFlushOnPageHide = () => {
 	// calls preventDefault(), so WordPress's own "unsaved changes" prompt is unaffected.
 	window.addEventListener( 'beforeunload', saveAllBeforeUnload );
 	window.addEventListener( 'pagehide', saveAllBeforeUnload );
+};
+
+// Opening a template or pattern from the post saves the post's edited blocks right
+// away, since tracking pauses until the post is shown again.
+export const startFlushOnSharedContent = () => {
+	let wasEditingSharedContent = isEditingSharedContent();
+
+	subscribe( () => {
+		const editingSharedContent = isEditingSharedContent();
+
+		if ( editingSharedContent && ! wasEditingSharedContent ) {
+			runCheckpoint( { saveAll: true } ).catch( logError );
+		}
+
+		wasEditingSharedContent = editingSharedContent;
+	}, 'core/editor' );
 };
