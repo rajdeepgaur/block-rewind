@@ -1,6 +1,6 @@
 import { select, subscribe } from '@wordpress/data';
 
-import { SCAN_THROTTLE_MS } from '../constants';
+import { BLOCK_ID_ATTRIBUTE, SCAN_THROTTLE_MS } from '../constants';
 import { markBlockDirty, pruneDirtyBlocks } from './dirty-registry';
 import {
 	notifyTrackedIdsChanged,
@@ -80,6 +80,69 @@ const captureSelectionBaseline = () => {
 	}
 };
 
+// Remembers a block's state when it is first tracked this session.
+const rememberInitialState = ( blockId, block ) => {
+	if ( ! runtimeState.initialStateByBlockId.has( blockId ) ) {
+		runtimeState.initialStateByBlockId.set( blockId, {
+			blockId,
+			blockName: block.name,
+			hash: computeBlockHash( block ),
+		} );
+	}
+};
+
+/**
+ * Gives blocks back the history IDs they lost when undo returned to the loaded post.
+ *
+ * Before WordPress 7.0, undoing all the way back to the state the post was loaded in
+ * rebuilds every block from the saved content, with new client IDs. Blocks first
+ * edited in this session lose their ID then. A block gets it back when its type and
+ * content match the state the ID was first tracked in, and no other block or ID
+ * matches as well. Nothing happens unless every client ID changed and there is
+ * nothing left to undo, so deleting or replacing blocks never re-links.
+ *
+ * @param {Object[]} blocks Flattened editor blocks of the current scan.
+ */
+const relinkAfterUndoToLoadedPost = ( blocks ) => {
+	if (
+		! runtimeState.idByClientId.size ||
+		blocks.some( ( block ) =>
+			runtimeState.scannedClientIds.has( block.clientId )
+		) ||
+		select( 'core/editor' ).hasEditorUndo()
+	) {
+		return;
+	}
+
+	const presentBlockIds = new Set();
+	const untrackedBlocks = [];
+	for ( const block of blocks ) {
+		const blockId = block.attributes?.[ BLOCK_ID_ATTRIBUTE ];
+		if ( blockId ) {
+			presentBlockIds.add( blockId );
+		} else if ( ! isEmptyBlock( block ) ) {
+			untrackedBlocks.push( {
+				clientId: block.clientId,
+				name: block.name,
+				hash: computeBlockHash( block ),
+			} );
+		}
+	}
+
+	const lostStates = Array.from(
+		runtimeState.idByClientId.values(),
+		( blockId ) => runtimeState.initialStateByBlockId.get( blockId )
+	).filter( Boolean );
+
+	for ( const [ clientId, blockId ] of matchOrphanedHistories(
+		untrackedBlocks,
+		lostStates,
+		presentBlockIds
+	) ) {
+		claimBlockId( runtimeState.identity, clientId, blockId );
+	}
+};
+
 /**
  * Scans the editor blocks: resolves IDs, starts tracking edited blocks and marks changes.
  *
@@ -111,6 +174,7 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 	runtimeState.trackedPostId = postId;
 
 	const blocks = getAllEditorBlocks();
+	relinkAfterUndoToLoadedPost( blocks );
 	const { idByClientId, writes } = resolveBlockIdentities(
 		blocks,
 		runtimeState.identity
@@ -135,6 +199,7 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 		writes.set( block.clientId, blockId );
 		runtimeState.pendingBaselines.delete( block.clientId );
 		runtimeState.observedByBlockId.set( blockId, baseline );
+		rememberInitialState( blockId, baseline );
 	}
 
 	const blockByBlockId = new Map();
@@ -147,6 +212,7 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 		}
 
 		blockByBlockId.set( blockId, block );
+		rememberInitialState( blockId, block );
 
 		const observed = runtimeState.observedByBlockId.get( blockId );
 		runtimeState.observedByBlockId.set( blockId, block );
@@ -189,6 +255,7 @@ export const scanEditorBlocks = ( { persistBaselines = true } = {} ) => {
 	);
 	runtimeState.idByClientId = idByClientId;
 	runtimeState.blockByBlockId = blockByBlockId;
+	runtimeState.scannedClientIds = presentClientIds;
 
 	writeBlockIdAttributes( writes );
 

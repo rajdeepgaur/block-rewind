@@ -28,34 +28,52 @@ const waitForPostType = ( page, postType ) =>
 		)
 		.toBe( postType );
 
-// Selects the block with the given text, then changes it like a user edit.
-const editBlockWithText = async ( page, text, content ) => {
+// Finds the block with the given text, or with no text given, the first heading or
+// paragraph of the template itself (outside template parts and Post Content).
+const findTextBlock = ( text ) => {
+	const blockEditor = window.wp.data.select( 'core/block-editor' );
+	const outside = [ 'core/template-part', 'core/post-content', 'core/block' ];
+
+	return blockEditor.getClientIdsWithDescendants().find( ( clientId ) => {
+		const content = String(
+			blockEditor.getBlockAttributes( clientId ).content ?? ''
+		);
+		if ( text !== null ) {
+			return content === text;
+		}
+
+		return (
+			[ 'core/heading', 'core/paragraph' ].includes(
+				blockEditor.getBlockName( clientId )
+			) &&
+			content.trim() !== '' &&
+			! blockEditor
+				.getBlockParents( clientId )
+				.some( ( parent ) =>
+					outside.includes( blockEditor.getBlockName( parent ) )
+				)
+		);
+	} );
+};
+
+// Selects a block (see findTextBlock), then changes its text like a user edit.
+const editTextBlock = async ( page, content, text = null ) => {
 	// The blocks load shortly after the editor switches to the template or pattern.
-	await page.waitForFunction( ( blockText ) => {
-		const blockEditor = window.wp.data.select( 'core/block-editor' );
-		return blockEditor
-			.getClientIdsWithDescendants()
-			.some(
-				( blockClientId ) =>
-					String(
-						blockEditor.getBlockAttributes( blockClientId ).content
-					) === blockText
-			);
-	}, text );
-	const clientId = await page.evaluate( ( blockText ) => {
-		const { select, dispatch } = window.wp.data;
-		const blockEditor = select( 'core/block-editor' );
-		const id = blockEditor
-			.getClientIdsWithDescendants()
-			.find(
-				( blockClientId ) =>
-					String(
-						blockEditor.getBlockAttributes( blockClientId ).content
-					) === blockText
-			);
-		dispatch( 'core/block-editor' ).selectBlock( id );
-		return id;
-	}, text );
+	await page.waitForFunction(
+		( [ source, blockText ] ) =>
+			// eslint-disable-next-line no-new-func
+			new Function( `return (${ source })` )()( blockText ),
+		[ findTextBlock.toString(), text ]
+	);
+	const clientId = await page.evaluate(
+		( [ source, blockText ] ) => {
+			// eslint-disable-next-line no-new-func
+			const id = new Function( `return (${ source })` )()( blockText );
+			window.wp.data.dispatch( 'core/block-editor' ).selectBlock( id );
+			return id;
+		},
+		[ findTextBlock.toString(), text ]
+	);
 	// Longer than the scan throttle, as between a click and typing.
 	await page.waitForTimeout( 500 );
 	await page.evaluate(
@@ -132,7 +150,7 @@ test.describe( 'Templates and patterns opened from a post', () => {
 		await waitForPostType( page, 'wp_block' );
 		await expect.poll( contents ).toEqual( [ 'Hello', 'Hello world' ] );
 
-		await editBlockWithText( page, 'In pattern', 'In pattern edited' );
+		await editTextBlock( page, 'In pattern edited', 'In pattern' );
 		await page.waitForTimeout( 500 );
 		await flushHistory( page );
 		await page.waitForTimeout( 500 );
@@ -168,13 +186,16 @@ test.describe( 'Templates and patterns opened from a post', () => {
 		page,
 	} ) => {
 		const postId = await openPostWithPattern( { admin, editor, page } );
-		const templateId = await page.evaluate( () =>
-			window.wp.data.select( 'core/editor' ).getCurrentTemplateId()
-		);
+		// The template loads shortly after the post on WordPress before 7.0.
+		const templateId = await (
+			await page.waitForFunction( () =>
+				window.wp.data.select( 'core/editor' ).getCurrentTemplateId()
+			)
+		).jsonValue();
 
 		await openEntity( page, 'wp_template', templateId );
 		await waitForPostType( page, 'wp_template' );
-		await editBlockWithText( page, 'More posts', 'More posts edited' );
+		await editTextBlock( page, 'Edited template text' );
 		await page.waitForTimeout( 500 );
 		await flushHistory( page );
 		await page.waitForTimeout( 500 );

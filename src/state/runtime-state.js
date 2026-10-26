@@ -7,6 +7,10 @@ export const runtimeState = {
 	blockByBlockId: new Map(),
 	// blockId -> block object last seen by the scan, used to detect edits.
 	observedByBlockId: new Map(),
+	// blockId -> { blockName, hash } of the block when it was first tracked this session.
+	initialStateByBlockId: new Map(),
+	// Client IDs of all blocks in the latest scan.
+	scannedClientIds: new Set(),
 	// Block IDs whose pre-edit state was already saved this session.
 	baselineCapturedIds: new Set(),
 	// blockId -> pre-edit state whose save failed (e.g. storage full), saved again later.
