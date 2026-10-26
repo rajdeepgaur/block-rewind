@@ -1,11 +1,16 @@
 <?php
 /**
- * Plugin Name: Block Rewind – Version History for Blocks
- * Description: Preview and restore earlier versions of any block. Version history is kept in your browser, with nothing stored on the server.
- * Version: 0.1.0
- * Author: Rajdeep Singh Gaur
- * License: GPL-2.0-or-later
- * Text Domain: block-rewind
+ * Plugin Name:       Block Rewind – Version History for Blocks
+ * Plugin URI:        https://github.com/rajdeepgaur/block-rewind
+ * Description:       Preview and restore earlier versions of any block. Version history is kept in your browser, with nothing stored on the server.
+ * Version:           1.0.0
+ * Requires at least: 6.6
+ * Requires PHP:      7.4
+ * Author:            Rajdeep Singh Gaur
+ * Author URI:        https://profiles.wordpress.org/rajdeep95/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       block-rewind
  *
  * @package BlockRewind
  */
