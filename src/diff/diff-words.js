@@ -1,3 +1,5 @@
+import { splitCharacters } from '../utils/truncate-text';
+
 // Above this many comparisons the diff falls back to "all removed, all added".
 const MAX_DIFF_CELLS = 1000000;
 
@@ -81,17 +83,96 @@ const diffTokens = ( fromTokens, toTokens ) => {
 	return steps;
 };
 
+// Counts the words in a text.
+export const countWords = ( text ) =>
+	tokenize( text ).filter( ( token ) => ! isWhitespace( token ) ).length;
+
+// Characters the two words share at their start and at their end. The end is only
+// matched in what is left after the start, so the two never overlap.
+const getSharedEdges = ( fromCharacters, toCharacters ) => {
+	const shorter = Math.min( fromCharacters.length, toCharacters.length );
+	let start = 0;
+	while (
+		start < shorter &&
+		fromCharacters[ start ] === toCharacters[ start ]
+	) {
+		start += 1;
+	}
+
+	let end = 0;
+	while (
+		end < shorter - start &&
+		fromCharacters[ fromCharacters.length - 1 - end ] ===
+			toCharacters[ toCharacters.length - 1 - end ]
+	) {
+		end += 1;
+	}
+
+	return { start, end, shorter };
+};
+
+// Whether two words are alike enough to compare letter by letter: together, their
+// shared start and end cover at least half of the shorter word.
+const isSimilarWord = ( fromWord, toWord ) => {
+	const { start, end, shorter } = getSharedEdges(
+		splitCharacters( fromWord ),
+		splitCharacters( toWord )
+	);
+	return start + end >= Math.ceil( shorter / 2 );
+};
+
+// Marks only the middle of a replaced word, e.g. "jgg" + removed "bt4rev".
+const pushWordChange = ( segments, fromWord, toWord ) => {
+	const fromCharacters = splitCharacters( fromWord );
+	const toCharacters = splitCharacters( toWord );
+	const { start, end } = getSharedEdges( fromCharacters, toCharacters );
+	const join = ( characters ) => characters.join( '' );
+
+	pushSegment( segments, 'equal', join( fromCharacters.slice( 0, start ) ) );
+	pushSegment(
+		segments,
+		'removed',
+		join( fromCharacters.slice( start, fromCharacters.length - end ) )
+	);
+	pushSegment(
+		segments,
+		'added',
+		join( toCharacters.slice( start, toCharacters.length - end ) )
+	);
+	pushSegment(
+		segments,
+		'equal',
+		join( fromCharacters.slice( fromCharacters.length - end ) )
+	);
+};
+
+// Whether a changed stretch replaces words one for one, with the same spacing,
+// by similar words, e.g. a typo fix or a word typed on.
+const isWordForWordChange = ( fromTokens, toTokens ) =>
+	fromTokens.length === toTokens.length &&
+	fromTokens.every( ( fromToken, index ) => {
+		const toToken = toTokens[ index ];
+		return isWhitespace( fromToken ) || isWhitespace( toToken )
+			? fromToken === toToken
+			: isSimilarWord( fromToken, toToken );
+	} );
+
 /**
  * Compares two texts word by word.
  *
  * Whitespace between two changed words is attached to the change, so a replaced
  * phrase reads as one removed and one added run rather than alternating words.
+ * When words are replaced one for one by similar words, only the letters that
+ * differ are marked.
+ *
+ * Counts treat a removed word followed by an added one as one changed word.
  *
  * @param {string} fromText Text before.
  * @param {string} toText   Text after.
- * @return {Array<{type: 'equal'|'removed'|'added', text: string}>} Segments in reading order.
+ * @return {{segments: Array<{type: 'equal'|'removed'|'added', text: string}>, changedWords: number, removedWords: number, addedWords: number}}
+ *         Segments in reading order, and the number of words changed, only removed and only added.
  */
-export const diffWords = ( fromText, toText ) => {
+export const diffText = ( fromText, toText ) => {
 	const fromTokens = tokenize( fromText );
 	const toTokens = tokenize( toText );
 
@@ -129,15 +210,32 @@ export const diffWords = ( fromText, toText ) => {
 			.map( ( text ) => ( { type: 'equal', text } ) ),
 	];
 
-	// A whitespace token kept between two changes joins the removed and added runs
-	// on both sides, instead of splitting them into word-sized pieces.
+	// A whitespace token kept between two changes belongs to the change on both
+	// sides, so each changed stretch is handled as one.
 	const removed = [];
 	const added = [];
 	const segments = [];
+	const counts = { changedWords: 0, removedWords: 0, addedWords: 0 };
 
 	const flushChanges = () => {
-		pushSegment( segments, 'removed', removed.join( '' ) );
-		pushSegment( segments, 'added', added.join( '' ) );
+		const removedCount = countWords( removed.join( '' ) );
+		const addedCount = countWords( added.join( '' ) );
+		const changedCount = Math.min( removedCount, addedCount );
+		counts.changedWords += changedCount;
+		counts.removedWords += removedCount - changedCount;
+		counts.addedWords += addedCount - changedCount;
+
+		if ( changedCount && isWordForWordChange( removed, added ) ) {
+			removed.forEach( ( fromToken, index ) =>
+				isWhitespace( fromToken )
+					? pushSegment( segments, 'equal', fromToken )
+					: pushWordChange( segments, fromToken, added[ index ] )
+			);
+		} else {
+			pushSegment( segments, 'removed', removed.join( '' ) );
+			pushSegment( segments, 'added', added.join( '' ) );
+		}
+
 		removed.length = 0;
 		added.length = 0;
 	};
@@ -171,23 +269,13 @@ export const diffWords = ( fromText, toText ) => {
 	} );
 
 	flushChanges();
-	return segments;
+	return { segments, ...counts };
 };
-
-// Counts the words in a text.
-export const countWords = ( text ) =>
-	tokenize( text ).filter( ( token ) => ! isWhitespace( token ) ).length;
-
-// Counts the words of all segments of one type.
-export const countSegmentWords = ( segments, type ) =>
-	segments
-		.filter( ( segment ) => segment.type === type )
-		.reduce( ( total, segment ) => total + countWords( segment.text ), 0 );
 
 /**
  * Shortens long unchanged runs to a few words of context around each change.
  *
- * @param {Array<{type: string, text: string}>} segments Segments from diffWords().
+ * @param {Array<{type: string, text: string}>} segments Segments from diffText().
  * @param {number}                              context  Words kept next to a change.
  * @param {Set<number>}                         expanded Indexes of segments shown in full.
  * @return {Array<{type: string, text?: string, words?: number, index?: number}>} Segments,

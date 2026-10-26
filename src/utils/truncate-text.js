@@ -1,6 +1,6 @@
 // Splits text into the characters people see: graphemes where the browser supports
 // it, otherwise code points, so emoji and accents are never cut in half.
-const splitCharacters = ( text ) =>
+export const splitCharacters = ( text ) =>
 	typeof Intl !== 'undefined' && Intl.Segmenter
 		? Array.from(
 				new Intl.Segmenter().segment( text ),

@@ -4,7 +4,7 @@ import {
 	stableStringify,
 } from '../serialization/serialize-block';
 import { getBlockName, getOwnInnerBlocks } from '../utils/external-content';
-import { countSegmentWords, diffWords } from './diff-words';
+import { diffText } from './diff-words';
 
 // Attributes whose string values are the block's readable text.
 const TEXT_KEY_PATTERN =
@@ -155,19 +155,16 @@ export const getPath = ( object, path ) =>
 
 // Compares the text of two blocks; null when the text is the same. When only the
 // formatting differs (bold, links), the words are equal and `formattingOnly` is set.
+// A removed word followed by an added one counts as one changed word.
 const describeText = ( fromText, toText, isFormattingChanged = false ) => {
 	if ( fromText === toText && ! isFormattingChanged ) {
 		return null;
 	}
 
-	const segments = diffWords( fromText, toText );
-
 	return {
 		from: fromText,
 		to: toText,
-		segments,
-		removedWords: countSegmentWords( segments, 'removed' ),
-		addedWords: countSegmentWords( segments, 'added' ),
+		...diffText( fromText, toText ),
 		formattingOnly: fromText === toText,
 	};
 };

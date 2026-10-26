@@ -13,7 +13,7 @@ const CONTEXT_WORDS = 10;
  * that run in full.
  *
  * @param {Object}   props
- * @param {Object[]} props.segments     Segments from diffWords( now, version ).
+ * @param {Object[]} props.segments     Segments from diffText( now, version ).
  * @param {number}   props.contextWords Words kept next to each change.
  */
 export const TextDiff = ( { segments, contextWords = CONTEXT_WORDS } ) => {

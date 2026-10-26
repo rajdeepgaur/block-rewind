@@ -288,6 +288,61 @@ const formatBlockCount = ( count ) =>
 		count
 	);
 
+// Counts of the kinds of word changes, e.g. "1 changed", "2 removed", for text
+// that is not only changed. `addedLabel` names words that are added.
+const listWordChanges = (
+	{ changedWords, removedWords, addedWords },
+	addedLabel
+) =>
+	[
+		changedWords &&
+			sprintf(
+				/* translators: %d: number of words. */
+				_n( '%d changed', '%d changed', changedWords, 'block-rewind' ),
+				changedWords
+			),
+		removedWords &&
+			sprintf(
+				/* translators: %d: number of words. */
+				_n( '%d removed', '%d removed', removedWords, 'block-rewind' ),
+				removedWords
+			),
+		addedWords && sprintf( addedLabel( addedWords ), addedWords ),
+	]
+		.filter( Boolean )
+		.join( ', ' );
+
+// The note of the text row in the table, which compares the block now with the
+// version: "1 word changed", "3 removed", "1 changed, 2 brought back". Empty when
+// only spacing changed.
+const describeTextNote = ( text ) => {
+	if ( text.formattingOnly ) {
+		return __( 'Formatting only', 'block-rewind' );
+	}
+
+	if ( ! text.changedWords && ! text.removedWords && ! text.addedWords ) {
+		return '';
+	}
+
+	if ( ! text.removedWords && ! text.addedWords ) {
+		return sprintf(
+			/* translators: %d: number of words. */
+			_n(
+				'%d word changed',
+				'%d words changed',
+				text.changedWords,
+				'block-rewind'
+			),
+			text.changedWords
+		);
+	}
+
+	return listWordChanges( text, ( count ) =>
+		/* translators: %d: number of words. */
+		_n( '%d brought back', '%d brought back', count, 'block-rewind' )
+	);
+};
+
 /**
  * Builds the rows of the "Restoring will change" table.
  *
@@ -309,48 +364,12 @@ export const getChangeRows = ( changes, presets ) => {
 	}
 
 	if ( changes.text ) {
-		const { from, to, removedWords, addedWords, formattingOnly } =
-			changes.text;
-		const notes = [];
-
-		if ( removedWords ) {
-			notes.push(
-				sprintf(
-					/* translators: %d: number of words. */
-					_n(
-						'%d removed',
-						'%d removed',
-						removedWords,
-						'block-rewind'
-					),
-					removedWords
-				)
-			);
-		}
-
-		if ( addedWords ) {
-			notes.push(
-				sprintf(
-					/* translators: %d: number of words. */
-					_n(
-						'%d brought back',
-						'%d brought back',
-						addedWords,
-						'block-rewind'
-					),
-					addedWords
-				)
-			);
-		}
-
 		rows.push( {
 			key: 'text',
 			label: __( 'Text', 'block-rewind' ),
-			now: { text: formatWordCount( countWords( from ) ) },
-			after: { text: formatWordCount( countWords( to ) ) },
-			note: formattingOnly
-				? __( 'Formatting only', 'block-rewind' )
-				: notes.join( ', ' ),
+			now: { text: formatWordCount( countWords( changes.text.from ) ) },
+			after: { text: formatWordCount( countWords( changes.text.to ) ) },
+			note: describeTextNote( changes.text ),
 		} );
 	}
 
@@ -390,6 +409,69 @@ export const getChangeRows = ( changes, presets ) => {
 	return rows;
 };
 
+// The text label in the history list, which compares a version with the one before
+// it: "Text: 2 words changed", "Text: 5 words added", "Text: 1 changed, 2 added".
+const describeTextSummary = ( text ) => {
+	const { changedWords, removedWords, addedWords } = text;
+
+	if ( text.formattingOnly ) {
+		return __( 'Text formatting', 'block-rewind' );
+	}
+
+	// Only spacing changed.
+	if ( ! changedWords && ! removedWords && ! addedWords ) {
+		return __( 'Text', 'block-rewind' );
+	}
+
+	if ( changedWords && ! removedWords && ! addedWords ) {
+		return sprintf(
+			/* translators: %d: number of words. */
+			_n(
+				'Text: %d word changed',
+				'Text: %d words changed',
+				changedWords,
+				'block-rewind'
+			),
+			changedWords
+		);
+	}
+
+	if ( addedWords && ! changedWords && ! removedWords ) {
+		return sprintf(
+			/* translators: %d: number of words. */
+			_n(
+				'Text: %d word added',
+				'Text: %d words added',
+				addedWords,
+				'block-rewind'
+			),
+			addedWords
+		);
+	}
+
+	if ( removedWords && ! changedWords && ! addedWords ) {
+		return sprintf(
+			/* translators: %d: number of words. */
+			_n(
+				'Text: %d word removed',
+				'Text: %d words removed',
+				removedWords,
+				'block-rewind'
+			),
+			removedWords
+		);
+	}
+
+	return sprintf(
+		/* translators: %s: kinds of word changes, e.g. "1 changed, 2 added". */
+		__( 'Text: %s', 'block-rewind' ),
+		listWordChanges( text, ( count ) =>
+			/* translators: %d: number of words. */
+			_n( '%d added', '%d added', count, 'block-rewind' )
+		)
+	);
+};
+
 /**
  * Summarizes what a version changed compared with the version before it, as short
  * labels for the history list, e.g. "Text: 5 words added", "Font size".
@@ -412,46 +494,7 @@ export const summarizeChanges = ( changes, maxItems = 3 ) => {
 	}
 
 	if ( changes.text ) {
-		const { addedWords, removedWords, formattingOnly } = changes.text;
-
-		if ( formattingOnly ) {
-			labels.push( __( 'Text formatting', 'block-rewind' ) );
-		} else if ( addedWords && removedWords ) {
-			labels.push(
-				sprintf(
-					/* translators: 1: words added. 2: words removed. */
-					__( 'Text: %1$d added, %2$d removed', 'block-rewind' ),
-					addedWords,
-					removedWords
-				)
-			);
-		} else if ( addedWords ) {
-			labels.push(
-				sprintf(
-					/* translators: %d: number of words. */
-					_n(
-						'Text: %d word added',
-						'Text: %d words added',
-						addedWords,
-						'block-rewind'
-					),
-					addedWords
-				)
-			);
-		} else {
-			labels.push(
-				sprintf(
-					/* translators: %d: number of words. */
-					_n(
-						'Text: %d word removed',
-						'Text: %d words removed',
-						removedWords,
-						'block-rewind'
-					),
-					removedWords
-				)
-			);
-		}
+		labels.push( describeTextSummary( changes.text ) );
 	}
 
 	changes.attributes.forEach( ( { path } ) => {
