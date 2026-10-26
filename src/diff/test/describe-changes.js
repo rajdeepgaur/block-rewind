@@ -79,6 +79,7 @@ describe( 'describeChanges', () => {
 		expect( hasChanges ).toBe( true );
 		expect( text ).toMatchObject( {
 			formattingOnly: true,
+			changedWords: 0,
 			removedWords: 0,
 			addedWords: 0,
 		} );
@@ -93,6 +94,7 @@ describe( 'describeChanges', () => {
 		expect( text ).toMatchObject( {
 			from: 'Hello there. Edit one. Edit two.',
 			to: 'Hello there. Edit one.',
+			changedWords: 0,
 			removedWords: 2,
 			addedWords: 0,
 		} );
@@ -169,7 +171,7 @@ describe( 'describeChanges', () => {
 					index: 0,
 					fromName: 'core/paragraph',
 					toName: 'core/paragraph',
-					text: { removedWords: 1, addedWords: 0 },
+					text: { changedWords: 0, removedWords: 1, addedWords: 0 },
 					attributes: [],
 				},
 			],

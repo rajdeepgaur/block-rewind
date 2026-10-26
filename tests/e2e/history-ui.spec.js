@@ -209,6 +209,37 @@ test.describe( 'Compare modal', () => {
 		await modal.getByRole( 'button', { name: 'Cancel' } ).click();
 		await expect( modal ).toBeHidden();
 	} );
+
+	test( 'marks only the letters of a word that was typed on', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+		await editParagraph( { editor, page }, 'world' );
+		await flushHistory( page );
+
+		const sidebar = await openHistorySidebar( page );
+		const entries = getVersionRows( sidebar );
+		await expect( entries ).toHaveCount( 2 );
+		await expect( entries.first() ).toContainText( 'Text: 1 word changed' );
+
+		await clickVersionAction( entries.last(), 'Compare' );
+		const modal = page.getByRole( 'dialog', {
+			name: 'Version from before editing',
+		} );
+		await expect(
+			modal.getByRole( 'row', {
+				name: /^Text 1 word 1 word 1 word changed/,
+			} )
+		).toBeVisible();
+
+		await modal.getByRole( 'tab', { name: 'Text changes' } ).click();
+		const diff = modal.locator( '.block-rewind-text-diff' );
+		await expect( diff ).toHaveText( 'Helloworld' );
+		await expect( diff.locator( 'del' ) ).toHaveText( 'world' );
+		await expect( diff.locator( 'ins' ) ).toHaveCount( 0 );
+	} );
 } );
 
 test.describe( 'Restoring a parent block', () => {
