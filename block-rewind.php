@@ -3,7 +3,7 @@
  * Plugin Name:       Block Rewind – Version History for Blocks
  * Plugin URI:        https://github.com/rajdeepgaur/block-rewind
  * Description:       Preview and restore earlier versions of any block. Version history is kept in your browser, with nothing stored on the server.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Rajdeep Singh Gaur
