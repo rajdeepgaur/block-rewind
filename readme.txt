@@ -4,7 +4,7 @@ Tags: block editor, revisions, version history, undo, restore
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -99,6 +99,9 @@ Block Rewind does not send any data to your server or to third parties, and it d
 3. The text changes a restore would make, word by word.
 
 == Changelog ==
+
+= 1.0.1 =
+* Fixed: clicks on buttons in the history list were sometimes lost, for example when opening an older version right after closing a comparison.
 
 = 1.0.0 =
 * Initial release.
