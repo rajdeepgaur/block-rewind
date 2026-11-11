@@ -73,6 +73,20 @@ const isRequestedForFocus = ( version, focusRequest ) =>
 			version.snapshot.timestamp >= focusRequest.savedAfter
 	);
 
+// Pressing the mouse on a button in the list leaves focus where it is, and focus
+// moves on click instead. A row with focus shows its buttons; if focus left it on
+// mouse down, those buttons would hide and the list would shift under the pointer
+// before the button is released, so the click would be lost.
+const keepFocusUntilClick = ( event ) => {
+	if ( event.button === 0 && event.target.closest( 'button' ) ) {
+		event.preventDefault();
+	}
+};
+
+const focusClickedButton = ( event ) => {
+	event.target.closest( 'button' )?.focus();
+};
+
 // One saved version, with Compare and Restore (shown on hover or keyboard focus).
 // The current version's heading can take focus, e.g. after a restore.
 const VersionRow = ( {
@@ -286,7 +300,13 @@ export const VersionTimeline = ( {
 	} );
 
 	return (
-		<div className="block-rewind-timeline">
+		// The handlers only move focus for the buttons inside; they add no interaction.
+		// eslint-disable-next-line jsx-a11y/no-static-element-interactions
+		<div
+			className="block-rewind-timeline"
+			onMouseDown={ keepFocusUntilClick }
+			onClickCapture={ focusClickedButton }
+		>
 			{ currentIndex === -1 && (
 				<NowRow hasVersions={ snapshots.length > 0 } />
 			) }

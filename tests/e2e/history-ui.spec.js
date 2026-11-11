@@ -65,6 +65,38 @@ test.describe( 'History sidebar', () => {
 		await expect( entries ).toHaveCount( 0 );
 	} );
 
+	test( 'opens an older version with one click after closing a comparison', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await openSavedPost( { admin, editor, page } );
+		await editParagraph( { editor, page } );
+		await flushHistory( page );
+		await page.keyboard.type( ' again' );
+		await flushHistory( page );
+		// An edit not saved yet, so no version is current and every row has buttons.
+		await page.keyboard.type( ' more' );
+
+		const sidebar = await openHistorySidebar( page );
+		const entries = getVersionRows( sidebar );
+		await expect( entries ).toHaveCount( 3 );
+
+		// Closing the comparison returns focus to Compare in the first row, so that
+		// row keeps its buttons showing.
+		await clickVersionAction( entries.first(), 'Compare' );
+		const firstModal = page.getByRole( 'dialog' );
+		await firstModal.getByRole( 'button', { name: 'Close' } ).click();
+		await expect( firstModal ).toBeHidden();
+
+		// A single click on an older row opens it, although the first row's buttons
+		// hide as focus moves.
+		await clickVersionAction( entries.last(), 'Compare' );
+		await expect(
+			page.getByRole( 'dialog', { name: 'Version from before editing' } )
+		).toBeVisible();
+	} );
+
 	test( 'asks for a single block when several are selected', async ( {
 		admin,
 		editor,
